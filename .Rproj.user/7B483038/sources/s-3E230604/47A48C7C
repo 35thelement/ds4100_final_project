@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1551390390161.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3368918941",
+    "id" : "47A48C7C",
+    "lastKnownWriteTime" : 1552611969,
+    "last_content_update" : 1553127716888,
+    "path" : "~/Documents/GBMDB/Global_Bilateral_Migration_Explorer.Rmd",
+    "project_path" : "Global_Bilateral_Migration_Explorer.Rmd",
+    "properties" : {
+        "cursorPosition" : "66,26",
+        "last_setup_crc32" : "3E230604ff39bfc6",
+        "scrollLine" : "53"
+    },
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}

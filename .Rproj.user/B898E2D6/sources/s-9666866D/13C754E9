@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1553223706700.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "13C754E9",
+    "lastKnownWriteTime" : 1553362775,
+    "last_content_update" : 1553362775188,
+    "path" : "~/Documents/GBMDB/populate_neo4j.R",
+    "project_path" : "populate_neo4j.R",
+    "properties" : {
+        "cursorPosition" : "96,8",
+        "scrollLine" : "94"
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

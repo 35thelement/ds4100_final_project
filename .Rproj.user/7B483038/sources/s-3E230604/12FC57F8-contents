@@ -1,0 +1,1691 @@
+---
+title: "Elezioni Italiano 2018"
+output:
+  flexdashboard::flex_dashboard:
+    social: menu
+    source: embed
+    fig_mobile: FALSE # Set TRUE to prerender figures for mobile devices, FALSE to minimize cache size
+    theme: journal
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+# These can all be installed with install.packages(pkg, dependencies=T)
+# Also requires installation, but not loading, of knitr, DT, htmltools, plyr, colorspace, and scales
+library(flexdashboard)
+library(shiny)
+library(dplyr)
+library(tibble)
+library(raster)
+library(leaflet)
+library(ggplot2)
+library(plotly)
+library(visNetwork)
+library(png)
+```
+
+```{r data, cache=TRUE}
+# Leaflet
+#####
+# Shapefiles are simplified. Geolocated Twitter data are added via point-in-polygon algorithm in QGIS.
+# Voting data added from Ministero dell'Interno
+circoscrizioni_camera <-
+shapefile('./data/SimplifiedShapefiles/circoscrizioni_camera.shp')
+circoscrizioni_camera@data[["USERS_TOT"]] <- as.numeric(circoscrizioni_camera@data[["USERS_TOT"]])
+circoscrizioni_camera@data[["USERS_FDI"]] <- as.numeric(circoscrizioni_camera@data[["USERS_FDI"]])
+circoscrizioni_camera@data[["USERS_FI"]] <- as.numeric(circoscrizioni_camera@data[["USERS_FI"]])
+circoscrizioni_camera@data[["USERS_LN"]] <- as.numeric(circoscrizioni_camera@data[["USERS_LN"]])
+circoscrizioni_camera@data[["USERS_M5S"]] <- as.numeric(circoscrizioni_camera@data[["USERS_M5S"]])
+circoscrizioni_camera@data[["USERS_PD"]] <- as.numeric(circoscrizioni_camera@data[["USERS_PD"]])
+
+circoscrizioni_senato <-
+shapefile('./data/SimplifiedShapefiles/circoscrizioni_senato.shp')
+circoscrizioni_senato@data[["USERS_TOT"]] <- as.numeric(circoscrizioni_senato@data[["USERS_TOT"]])
+circoscrizioni_senato@data[["USERS_FDI"]] <- as.numeric(circoscrizioni_senato@data[["USERS_FDI"]])
+circoscrizioni_senato@data[["USERS_FI"]] <- as.numeric(circoscrizioni_senato@data[["USERS_FI"]])
+circoscrizioni_senato@data[["USERS_LN"]] <- as.numeric(circoscrizioni_senato@data[["USERS_LN"]])
+circoscrizioni_senato@data[["USERS_M5S"]] <- as.numeric(circoscrizioni_senato@data[["USERS_M5S"]])
+circoscrizioni_senato@data[["USERS_PD"]] <- as.numeric(circoscrizioni_senato@data[["USERS_PD"]])
+
+province_c_metropolitane <-
+shapefile('./data/SimplifiedShapefiles/province_c_metropolitane.shp')
+province_c_metropolitane@data[["TWEETS_TOT"]] <- as.numeric(province_c_metropolitane@data[["TWEETS_TOT"]])
+province_c_metropolitane@data[["TWEETS_FDI"]] <- as.numeric(province_c_metropolitane@data[["TWEETS_FDI"]])
+province_c_metropolitane@data[["TWEETS_FI"]] <- as.numeric(province_c_metropolitane@data[["TWEETS_FI"]])
+province_c_metropolitane@data[["TWEETS_LN"]] <- as.numeric(province_c_metropolitane@data[["TWEETS_LN"]])
+province_c_metropolitane@data[["TWEETS_M5S"]] <- as.numeric(province_c_metropolitane@data[["TWEETS_M5S"]])
+province_c_metropolitane@data[["TWEETS_PD"]] <- as.numeric(province_c_metropolitane@data[["TWEETS_PD"]])
+province_c_metropolitane@data[["USERS_TOT"]] <- as.numeric(province_c_metropolitane@data[["USERS_TOT"]])
+province_c_metropolitane@data[["USERS_FDI"]] <- as.numeric(province_c_metropolitane@data[["USERS_FDI"]])
+province_c_metropolitane@data[["USERS_FI"]] <- as.numeric(province_c_metropolitane@data[["USERS_FI"]])
+province_c_metropolitane@data[["USERS_LN"]] <- as.numeric(province_c_metropolitane@data[["USERS_LN"]])
+province_c_metropolitane@data[["USERS_M5S"]] <- as.numeric(province_c_metropolitane@data[["USERS_M5S"]])
+province_c_metropolitane@data[["USERS_PD"]] <- as.numeric(province_c_metropolitane@data[["USERS_PD"]])
+
+# store url and attribution for mapbox light basemap
+basemap <- sprintf("//{s}.tiles.mapbox.com/v4/%s/{z}/{x}/{y}.png?access_token=%s", "mapbox.light", "pk.eyJ1Ijoicmxld2ludGVyIiwiYSI6ImNqaTIyNmptMDA2dzgzd3Brd2Mzc2pjZHgifQ.z6-O73pF5AzT8dxoE4KyCw")
+basemap_attr <- 'Maps by <a href="http://www.mapbox.com/">Mapbox</a>'
+
+# create labels for region/district on-hover popup layers
+senato_labels <- sprintf(
+  "<strong>%s</strong><br/>Pop. 2011: %s<br/>Utenti Totale: %s<br/>Tweets Totale: %s<br/>Voti Totale (FDI, FI, Lega, M5S, PD): %s",
+  circoscrizioni_senato@data[["REGIONE"]], circoscrizioni_senato@data[["POP_2011"]],
+  circoscrizioni_senato@data[["USERS_TOT"]], circoscrizioni_senato@data[["TWEETS_TOT"]], 
+  circoscrizioni_senato@data[["VOTES_TOT"]]
+) %>% lapply(htmltools::HTML)
+
+camera_labels <- sprintf(
+  "<strong>%s</strong><br/>Pop. 2011: %s<br/>Utenti Totale: %s<br/>Tweets Totale: %s<br/>Voti Totale (FDI, FI, Lega, M5S, PD): %s",
+  circoscrizioni_camera@data[["CIRCO17_D"]], circoscrizioni_camera@data[["POP_2011"]],
+  circoscrizioni_camera@data[["USERS_TOT"]], circoscrizioni_camera@data[["TWEETS_TOT"]], 
+  circoscrizioni_camera@data[["VOTES_TOT"]]
+) %>% lapply(htmltools::HTML)
+
+province_labels <- sprintf(
+  "<strong>%s %s</strong><br/>Pop. 2011: %s<br/>Utenti Totale: %s<br/>Tweets Totale: %s",
+  province_c_metropolitane@data[["PROVINCIA"]], province_c_metropolitane@data[["CITTAMETRO"]], 
+  province_c_metropolitane@data[["POP_2011"]], province_c_metropolitane@data[["USERS_TOT"]], 
+  province_c_metropolitane@data[["TWEETS_TOT"]]
+) %>% lapply(htmltools::HTML)
+
+
+# create raster images (shaded color scales for tweets, users, & population)
+# palettes and bins/breaks are identical to cartograms
+population_raster <- raster(xmn = 6.626621,xmx = 18.52038,ymn = 35.493773,ymx = 47.09178)
+population_raster <- rasterize(province_c_metropolitane, population_raster, field = "POP_2011")
+crs(population_raster) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +towgs84=0,0,0")
+population_raster <- projectRasterForLeaflet(population_raster, method="bilinear")
+population_pal <- colorBin(
+  colorspace::sequential_hcl(9,h=340,c=100,l=c(100,20)),
+  domain = values(population_raster),
+  bins = c(85000,100000,200000,300000,500000,800000,1300000,2000000,3000000,4000000),
+  na.color = 'transparent'
+)
+tweet_tot_raster <- raster(xmn = 6.626621,xmx = 18.52038,ymn = 35.493773,ymx = 47.09178)
+tweet_tot_raster <- rasterize(province_c_metropolitane, tweet_tot_raster, field = "TWEETS_TOT")
+crs(tweet_tot_raster) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +towgs84=0,0,0")
+tweet_tot_raster <- projectRasterForLeaflet(tweet_tot_raster, method="bilinear")
+tweet_tot_pal <- colorBin(
+  colorspace::sequential_hcl(10,h=300,c=100,l=c(100,20)),
+  domain = values(tweet_tot_raster),
+  bins = c(3500,5000,7000,10000,20000,30000,50000,100000,
+           150000,200000,300000,500000,700000,920000),
+  na.color = 'transparent'
+)
+tweet_fdi_raster <- raster(xmn = 6.626621,xmx = 18.52038,ymn = 35.493773,ymx = 47.09178)
+tweet_fdi_raster <- rasterize(province_c_metropolitane, tweet_fdi_raster, field = "TWEETS_FDI")
+crs(tweet_fdi_raster) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +towgs84=0,0,0")
+tweet_fdi_raster <- projectRasterForLeaflet(tweet_fdi_raster, method="bilinear")
+tweet_fdi_pal <- colorBin(
+  colorspace::sequential_hcl(11,h=260,c=c(65,40),l=c(120,15)),
+  domain = values(tweet_fdi_raster),
+  bins = c(50,200,500,1000,2000,3000,5000,8000,13000,20000,30000,41000),
+  na.color = 'transparent'
+)
+tweet_fi_raster <- raster(xmn = 6.626621,xmx = 18.52038,ymn = 35.493773,ymx = 47.09178)
+tweet_fi_raster <- rasterize(province_c_metropolitane, tweet_fi_raster, field = "TWEETS_FI")
+crs(tweet_fi_raster) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +towgs84=0,0,0")
+tweet_fi_raster <- projectRasterForLeaflet(tweet_fi_raster, method="bilinear")
+tweet_fi_pal <- colorBin(
+  colorspace::sequential_hcl(11,h=195,c=70,l=c(160,10)),
+  domain = values(tweet_fi_raster),
+  bins = c(350,500,1000,2000,5000,10000,20000,30000,50000,70000,100000,126000),
+  na.color = 'transparent'
+)
+tweet_ln_raster <- raster(xmn = 6.626621,xmx = 18.52038,ymn = 35.493773,ymx = 47.09178)
+tweet_ln_raster <- rasterize(province_c_metropolitane, tweet_ln_raster, field = "TWEETS_LN")
+crs(tweet_ln_raster) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +towgs84=0,0,0")
+tweet_ln_raster <- projectRasterForLeaflet(tweet_ln_raster, method="bilinear")
+tweet_ln_pal <- colorBin(
+  colorspace::sequential_hcl(12,h=115,c=70,l=c(100,10)),
+  domain = values(tweet_ln_raster),
+  bins = c(300,5000,10000,15000,20000,30000,40000,50000,60000,70000,100000,150000,200000,263000),
+  na.color = 'transparent'
+)
+tweet_m5s_raster <- raster(xmn = 6.626621,xmx = 18.52038,ymn = 35.493773,ymx = 47.09178)
+tweet_m5s_raster <- rasterize(province_c_metropolitane, tweet_m5s_raster, field = "TWEETS_M5S")
+crs(tweet_m5s_raster) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +towgs84=0,0,0")
+tweet_m5s_raster <- projectRasterForLeaflet(tweet_m5s_raster, method="bilinear")
+tweet_m5s_pal <- colorBin(
+  colorspace::sequential_hcl(14,h=80,c=150,l=c(100,10)),
+  domain = values(tweet_m5s_raster),
+  bins = c(1300,7500,15000,22500,30000,40000,50000,60000,75000,100000,
+           125000,150000,200000,250000,350000),
+  na.color = 'transparent'
+)
+tweet_pd_raster <- raster(xmn = 6.626621,xmx = 18.52038,ymn = 35.493773,ymx = 47.09178)
+tweet_pd_raster <- rasterize(province_c_metropolitane, tweet_pd_raster, field = "TWEETS_PD")
+crs(tweet_pd_raster) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +towgs84=0,0,0")
+tweet_pd_raster <- projectRasterForLeaflet(tweet_pd_raster, method="bilinear")
+tweet_pd_pal <- colorBin(
+  colorspace::sequential_hcl(12,h=375,c=190,l=c(110,10)),
+  domain = values(tweet_pd_raster),
+  bins = c(500,3500,7500,12500,17500,22500,30000,40000,50000,70000,100000,130000,160000),
+  na.color = 'transparent'
+)
+user_tot_raster <- raster(xmn = 6.626621,xmx = 18.52038,ymn = 35.493773,ymx = 47.09178)
+user_tot_raster <- rasterize(province_c_metropolitane, user_tot_raster, field = "USERS_TOT")
+crs(user_tot_raster) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +towgs84=0,0,0")
+user_tot_raster <- projectRasterForLeaflet(user_tot_raster, method="bilinear")
+user_tot_pal <- colorBin(
+  colorspace::sequential_hcl(12,h=300,c=100,l=c(100,20)),
+  domain = values(user_tot_raster),
+  bins = c(0,200,500,800,1100,1500,2000,3000,4000,5000,6000,7000,8900),
+  na.color = 'transparent'
+)
+user_fdi_raster <- raster(xmn = 6.626621,xmx = 18.52038,ymn = 35.493773,ymx = 47.09178)
+user_fdi_raster <- rasterize(province_c_metropolitane, user_fdi_raster, field = "USERS_FDI")
+crs(user_fdi_raster) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +towgs84=0,0,0")
+user_fdi_raster <- projectRasterForLeaflet(user_fdi_raster, method="bilinear")
+user_fdi_pal <- colorBin(
+  colorspace::sequential_hcl(11,h=260,c=c(60,30),l=c(100,10)),
+  domain = values(user_fdi_raster),
+  bins = c(1,20,50,75,100,150,200,250,300,350,400,480),
+  na.color = 'transparent'
+)
+user_fi_raster <- raster(xmn = 6.626621,xmx = 18.52038,ymn = 35.493773,ymx = 47.09178)
+user_fi_raster <- rasterize(province_c_metropolitane, user_fi_raster, field = "USERS_FI")
+crs(user_fi_raster) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +towgs84=0,0,0")
+user_fi_raster <- projectRasterForLeaflet(user_fi_raster, method="bilinear")
+user_fi_pal <- colorBin(
+  colorspace::sequential_hcl(13,h=195,c=70,l=c(120,20)),
+  domain = values(user_fi_raster),
+  bins = c(2,30,60,100,150,200,250,300,350,400,500,750,1000,1400),
+  na.color = 'transparent'
+)
+user_ln_raster <- raster(xmn = 6.626621,xmx = 18.52038,ymn = 35.493773,ymx = 47.09178)
+user_ln_raster <- rasterize(province_c_metropolitane, user_ln_raster, field = "USERS_LN")
+crs(user_ln_raster) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +towgs84=0,0,0")
+user_ln_raster <- projectRasterForLeaflet(user_ln_raster, method="bilinear")
+user_ln_pal <- colorBin(
+  colorspace::sequential_hcl(11,h=115,c=80,l=c(100,10)),
+  domain = values(user_ln_raster),
+  bins = c(5,50,100,150,200,300,500,700,1000,1400,1800,2150),
+  na.color = 'transparent'
+)
+user_m5s_raster <- raster(xmn = 6.626621,xmx = 18.52038,ymn = 35.493773,ymx = 47.09178)
+user_m5s_raster <- rasterize(province_c_metropolitane, user_m5s_raster, field = "USERS_M5S")
+crs(user_m5s_raster) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +towgs84=0,0,0")
+user_m5s_raster <- projectRasterForLeaflet(user_m5s_raster, method="bilinear")
+user_m5s_pal <- colorBin(
+  colorspace::sequential_hcl(12,h=80,c=150,l=c(100,10)),
+  domain = values(user_m5s_raster),
+  bins = c(10,75,150,225,300,400,500,650,800,1000,1300,2400,3550),
+  na.color = 'transparent'
+)
+user_pd_raster <- raster(xmn = 6.626621,xmx = 18.52038,ymn = 35.493773,ymx = 47.09178)
+user_pd_raster <- rasterize(province_c_metropolitane, user_pd_raster, field = "USERS_PD")
+crs(user_pd_raster) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +towgs84=0,0,0")
+user_pd_raster <- projectRasterForLeaflet(user_pd_raster, method="bilinear")
+user_pd_pal <- colorBin(
+  colorspace::sequential_hcl(12,h=375,c=190,l=c(110,10)),
+  domain = values(user_pd_raster),
+  bins = c(5,35,75,125,175,250,350,500,700,900,1200,1500,1800),
+  na.color = 'transparent'
+)
+
+# store points/data for tweet/user circle plotting
+tcoords_tot <- as.data.frame(province_c_metropolitane[,c("xcoord","ycoord","TWEETS_TOT")])
+tcoords_fdi <- as.data.frame(province_c_metropolitane[,c("xcoord","ycoord","TWEETS_FDI")])
+tcoords_fi <- as.data.frame(province_c_metropolitane[,c("xcoord","ycoord","TWEETS_FI")])
+tcoords_ln <- as.data.frame(province_c_metropolitane[,c("xcoord","ycoord","TWEETS_LN")])
+tcoords_m5s <- as.data.frame(province_c_metropolitane[,c("xcoord","ycoord","TWEETS_M5S")])
+tcoords_pd <- as.data.frame(province_c_metropolitane[,c("xcoord","ycoord","TWEETS_PD")])
+
+ucoords_tot <- as.data.frame(province_c_metropolitane[,c("xcoord","ycoord","USERS_TOT")])
+ucoords_fdi <- as.data.frame(province_c_metropolitane[,c("xcoord","ycoord","USERS_FDI")])
+ucoords_fi <- as.data.frame(province_c_metropolitane[,c("xcoord","ycoord","USERS_FI")])
+ucoords_ln <- as.data.frame(province_c_metropolitane[,c("xcoord","ycoord","USERS_LN")])
+ucoords_m5s <- as.data.frame(province_c_metropolitane[,c("xcoord","ycoord","USERS_M5S")])
+ucoords_pd <- as.data.frame(province_c_metropolitane[,c("xcoord","ycoord","USERS_PD")])
+#####
+
+# Networks
+#####
+# Edges are always drawn in the direction of information transfer:
+# replier -> reply receiver
+# quoted -> quoter
+# mentioner -> mentioned
+
+# edge and node lists created in BigQuery from ground_truth_v3.timelines_geo_it_raw where users
+# are identified in dashboard.agg_userprefs
+partyedges <- read.csv("./data/networks/partyedges.csv")
+partynodes <- read.csv("./data/networks/partynodes.csv")
+# VisNetwork refers to column names for attributes
+partyedges[5] <- paste('peso:',partyedges$value)
+partyedges <- plyr::rename(partyedges,c('origin'='from','destination'='to','V5'='title'))
+partynodes[5] <- partynodes[1]
+partynodes[6] <- paste('dimensione:',partynodes$value)
+partynodes <- plyr::rename(partynodes,c('id.1'='label','V6'='title'))
+#####
+
+# Twitter / Voting Data Tables
+#####
+# This simply extracts twitter and voting data from shapefiles for display in tables
+circocam_df <- as.data.frame(circoscrizioni_camera)[,c(5,6,12:29)]
+rownames(circocam_df) <- gsub("^.*_","",circocam_df$CIRCO17_D)
+circocam_df <- circocam_df[,c(2:20)]
+
+circosen_df <- as.data.frame(circoscrizioni_senato)[,c(4,5,11:28)]
+rownames(circosen_df) <- circosen_df$REGIONE
+circosen_df <- circosen_df[,2:20]
+#####
+
+# Elections Data
+#####
+### All data here is compiled from the Ministero dell'Interno
+
+# turnout rates and invalid ballots
+ElezioniPrecedentiSenato <- read.csv('./data/ElezioniPrecedenti/Senato.csv')
+EPStotale <- ElezioniPrecedentiSenato[ElezioniPrecedentiSenato$RegionCode=="TOT",]
+EPSregionTurnout <- ElezioniPrecedentiSenato[ElezioniPrecedentiSenato$RegionCode %in% c('VDA','PIE','LOM','TAA','VEN','FVG','LIG','ERO','TOS','UMB','MAR','LAZ','ABR','MOL','CAM','PUG','BAS','CAL','SIC','SAR'),]
+ElezioniPrecedentiCamera <- read.csv('./data/ElezioniPrecedenti/Camera.csv')
+EPCtotale <- ElezioniPrecedentiCamera[ElezioniPrecedentiCamera$RegionCode=="TOT",]
+EPCregionTurnout <- ElezioniPrecedentiCamera[ElezioniPrecedentiCamera$RegionCode %in% c('VDA','PIE','LOM','TAA','VEN','FVG','LIG','ERO','TOS','UMB','MAR','LAZ','ABR','MOL','CAM','PUG','BAS','CAL','SIC','SAR'),]
+ElezioniPrecedentiCodice <- read.csv('./data/ElezioniPrecedenti/Codice.csv')
+
+# 4 March 2018 election results
+risultati_sen <- read.csv2('./data/risultati_senato.csv')
+risultati_cam <- read.csv('./data/risultati_camera.csv')
+#####
+```
+
+Mappa {data-orientation=rows}
+===========================================================================
+
+```{r}
+### Prevents leaflet legends from covering drop-down inputs
+includeCSS("./www/styles.css")
+```
+
+
+Row {data-height=100}
+---------------------------------------------------------------------------
+
+```{r}
+# Select polygon border set (linked to hover text)
+div(style="display:inlineblock",
+    selectInput(inputId = "chooseBaselayer", label = "Confini:",
+                choices = c("Circoscrizioni Senato","Circoscrizioni Camera","Province","Nessuno"),
+                selected = "Circoscrizioni Senato"))
+
+# Select data to plot for circles
+div(style="display:inlineblock",
+    selectInput(inputId="chooseCircleData", label="Cerchi (dati):",
+                choices = c("Nessuno", "Utenti", "Tweets"), selected = "Nessuno"))
+# Conditionally select party data for circles
+div(style="display:inlineblock",
+    conditionalPanel(condition = "input.chooseCircleData != 'Nessuno'",
+                     selectInput(inputId="chooseCircleParty", label="Cerchi (partito):",
+                                 choices = c("Totale","Forza Italia","Fratelli d'Italia","Lega",
+                                             "Movimento 5 Stelle","Partito Democratico"),
+                                 selected = "Totale")))
+
+# Select data for raster shading
+div(style="display:inlineblock",
+    selectInput(inputId="chooseRasterData", label="Sfumato (dati):",
+                choices = c("Nessuno", "Popolazione", "Utenti", "Tweets"),
+                selected = "Popolazione"))
+# Conditionally select party data for shading
+div(style="display:inlineblock",
+    conditionalPanel(condition = "(input.chooseRasterData != 'Popolazione') & (input.chooseRasterData != 'Nessuno')",
+                     selectInput(inputId="chooseRasterParty", label="Sfumato (partito):",
+                                 choices = c("Totale","Forza Italia","Fratelli d'Italia","Lega",
+                                             "Movimento 5 Stelle","Partito Democratico"),
+                                 selected = "Totale")))
+```
+
+Row {data-height=1100}
+---------------------------------------------------------------------------
+
+### Leaflet
+```{r, context="server"}
+# Create the leaflet map
+output$map <- renderLeaflet({
+  leaflet(options = leafletOptions(zoomControl = FALSE)) %>%
+    setView(lng = 12.51133, lat = 41.89193, zoom = 6) %>%
+    addTiles(urlTemplate = basemap, attribution = basemap_attr)
+})
+
+# Based on polygon border selection, update leaflet
+observeEvent(input$chooseBaselayer, {
+  mapProxy <- leafletProxy("map") %>% clearGroup("base")
+  if (input$chooseBaselayer == "Circoscrizioni Senato") {
+    mapProxy <- mapProxy %>%
+      addPolygons(
+        data = circoscrizioni_senato,
+        fillColor = 'white',
+        fillOpacity = 0.1,
+        stroke = T,
+        color = 'black',
+        opacity = 1,
+        weight = 1,
+        highlight = highlightOptions(
+          color = "navy",
+          weight = 3,
+          bringToFront = TRUE),
+        label = senato_labels,
+        labelOptions = labelOptions(
+          style = list("font-weight" = "normal", padding = "3px 8px"),
+          textsize = "15px", direction = "auto"),
+        group = 'base'
+      )
+  } else if (input$chooseBaselayer == "Circoscrizioni Camera") {
+    mapProxy <- mapProxy %>%
+      addPolygons(
+        data = circoscrizioni_camera,
+        fillColor = 'white',
+        fillOpacity = 0.1,
+        stroke = T,
+        color = 'black',
+        opacity = 1,
+        weight = 1,
+        highlight = highlightOptions(
+          color = "navy",
+          weight = 3,
+          bringToFront = TRUE),
+        label = camera_labels,
+        labelOptions = labelOptions(
+          style = list("font-weight" = "normal", padding = "3px 8px"),
+          textsize = "15px", direction = "auto"),
+        group = 'base'
+      )
+  } else if (input$chooseBaselayer == "Province") {
+    mapProxy <- mapProxy %>%
+      addPolygons(
+        data = province_c_metropolitane,
+        fillColor = 'white',
+        fillOpacity = 0.1,
+        stroke = T,
+        color = 'black',
+        opacity = 1,
+        weight = 1,
+        highlight = highlightOptions(
+          color = "navy",
+          weight = 3,
+          bringToFront = TRUE),
+        label = province_labels,
+        labelOptions = labelOptions(
+          style = list("font-weight" = "normal", padding = "3px 8px"),
+          textsize = "15px", direction = "auto"),
+        group = 'base'
+      )
+  } else if (input$chooseBaselayer == "Nessuno") {
+    
+  }
+})
+
+# Update leaflet based on circle data selection
+observeEvent({
+  input$chooseCircleData
+  input$chooseCircleParty
+}, {
+  mapProxy <- leafletProxy("map") %>% clearGroup("circles") %>% removeControl("circlelegend")
+  if (input$chooseCircleData == "Nessuno") {
+    
+  } else if (input$chooseCircleData == "Utenti") {
+    if (input$chooseCircleParty == "Totale") {
+      mapProxy <- mapProxy %>% addCircles(
+        data = ucoords_tot,
+        lng = ~xcoord,
+        lat = ~ycoord,
+        radius = sqrt(ucoords_tot[,"USERS_TOT"])*600,
+        stroke = T, weight = 1,
+        opacity = 1,
+        fillOpacity = 0.65,
+        color=~user_tot_pal(USERS_TOT),
+        group="circles"
+      ) %>%
+        addLegend(
+          pal = user_tot_pal,
+          position = 'topright',
+          values = values(user_tot_raster),
+          title = 'Cerchi: Utenti Totale',
+          layerId = "circlelegend"
+        )
+    } else if (input$chooseCircleParty == "Forza Italia") {
+      mapProxy <- mapProxy %>% addCircles(
+        data = ucoords_fi,
+        lng = ~xcoord,
+        lat = ~ycoord,
+        radius = sqrt(ucoords_fi[,"USERS_FI"])*600,
+        stroke = T, weight = 1,
+        opacity = 1,
+        fillOpacity = 0.65,
+        color=~user_fi_pal(USERS_FI),
+        group="circles"
+      ) %>%
+        addLegend(
+          pal = user_fi_pal,
+          position = 'topright',
+          values = values(user_fi_raster),
+          title = 'Cerchi: Utenti Forza Italia',
+          layerId = "circlelegend"
+        )
+    } else if (input$chooseCircleParty == "Fratelli d'Italia") {
+      mapProxy <- mapProxy %>% addCircles(
+        data = ucoords_fdi,
+        lng = ~xcoord,
+        lat = ~ycoord,
+        radius = sqrt(ucoords_fdi[,"USERS_FDI"])*600,
+        stroke = T, weight = 1,
+        opacity = 1,
+        fillOpacity = 0.65,
+        color=~user_fdi_pal(USERS_FDI),
+        group="circles"
+      ) %>%
+        addLegend(
+          pal = user_fdi_pal,
+          position = 'topright',
+          values = values(user_fdi_raster),
+          title = "Cerchi: Utenti Fratelli d'Italia",
+          layerId = "circlelegend"
+        )
+    } else if (input$chooseCircleParty == "Lega") {
+      mapProxy <- mapProxy %>% addCircles(
+        data = ucoords_ln,
+        lng = ~xcoord,
+        lat = ~ycoord,
+        radius = sqrt(ucoords_ln[,"USERS_LN"])*600,
+        stroke = T, weight = 1,
+        opacity = 1,
+        fillOpacity = 0.65,
+        color=~user_ln_pal(USERS_LN),
+        group="circles"
+      ) %>%
+        addLegend(
+          pal = user_ln_pal,
+          position = 'topright',
+          values = values(user_ln_raster),
+          title = 'Cerchi: Utenti Lega',
+          layerId = "circlelegend"
+        )
+    } else if (input$chooseCircleParty == "Movimento 5 Stelle") {
+      mapProxy <- mapProxy %>% addCircles(
+        data = ucoords_m5s,
+        lng = ~xcoord,
+        lat = ~ycoord,
+        radius = sqrt(ucoords_m5s[,"USERS_M5S"])*600,
+        stroke = T, weight = 1,
+        opacity = 1,
+        fillOpacity = 0.65,
+        color=~user_m5s_pal(USERS_M5S),
+        group="circles"
+      ) %>%
+        addLegend(
+          pal = user_m5s_pal,
+          position = 'topright',
+          values = values(user_m5s_raster),
+          title = 'Cerchi: Utenti Movimento 5 Stelle',
+          layerId = "circlelegend"
+        )
+    } else if (input$chooseCircleParty == "Partito Democratico") {
+      mapProxy <- mapProxy %>% addCircles(
+        data = ucoords_pd,
+        lng = ~xcoord,
+        lat = ~ycoord,
+        radius = sqrt(ucoords_pd[,"USERS_PD"])*600,
+        stroke = T, weight = 1,
+        opacity = 1,
+        fillOpacity = 0.65,
+        color=~user_pd_pal(USERS_PD),
+        group="circles"
+      ) %>%
+        addLegend(
+          pal = user_pd_pal,
+          position = 'topright',
+          values = values(user_pd_raster),
+          title = 'Cerchi: Utenti Partito Democratico',
+          layerId = "circlelegend"
+        )
+    }
+  } else if (input$chooseCircleData == "Tweets") {
+    if (input$chooseCircleParty == "Totale") {
+      mapProxy <- mapProxy %>% addCircles(
+        data = tcoords_tot,
+        lng = ~xcoord,
+        lat = ~ycoord,
+        radius = sqrt(tcoords_tot[,"TWEETS_TOT"])*65,
+        stroke = T, weight = 1,
+        opacity = 1,
+        fillOpacity = 0.65,
+        color=~tweet_tot_pal(TWEETS_TOT),
+        group="circles"
+      ) %>%
+        addLegend(
+          pal = tweet_tot_pal,
+          position = 'topright',
+          values = values(tweet_tot_raster),
+          title = 'Cerchi: Tweets Totale',
+          layerId = "circlelegend"
+        )
+    } else if (input$chooseCircleParty == "Forza Italia") {
+      mapProxy <- mapProxy %>% addCircles(
+        data = tcoords_fi,
+        lng = ~xcoord,
+        lat = ~ycoord,
+        radius = sqrt(tcoords_fi[,"TWEETS_FI"])*65,
+        stroke = T, weight = 1,
+        opacity = 1,
+        fillOpacity = 0.65,
+        color=~tweet_fi_pal(TWEETS_FI),
+        group="circles"
+      ) %>%
+        addLegend(
+          pal = tweet_fi_pal,
+          position = 'topright',
+          values = values(tweet_fi_raster),
+          title = 'Cerchi: Tweets Forza Italia',
+          layerId = "circlelegend"
+        )
+    } else if (input$chooseCircleParty == "Fratelli d'Italia") {
+      mapProxy <- mapProxy %>% addCircles(
+        data = tcoords_fdi,
+        lng = ~xcoord,
+        lat = ~ycoord,
+        radius = sqrt(tcoords_fdi[,"TWEETS_FDI"])*65,
+        stroke = T, weight = 1,
+        opacity = 1,
+        fillOpacity = 0.65,
+        color=~tweet_fdi_pal(TWEETS_FDI),
+        group="circles"
+      ) %>%
+        addLegend(
+          pal = tweet_fdi_pal,
+          position = 'topright',
+          values = values(tweet_fdi_raster),
+          title = "Cerchi: Tweets Fratelli d'Italia",
+          layerId = "circlelegend"
+        )
+    } else if (input$chooseCircleParty == "Lega") {
+      mapProxy <- mapProxy %>% addCircles(
+        data = tcoords_ln,
+        lng = ~xcoord,
+        lat = ~ycoord,
+        radius = sqrt(tcoords_ln[,"TWEETS_LN"])*65,
+        stroke = T, weight = 1,
+        opacity = 1,
+        fillOpacity = 0.65,
+        color=~tweet_ln_pal(TWEETS_LN),
+        group="circles"
+      ) %>%
+        addLegend(
+          pal = tweet_ln_pal,
+          position = 'topright',
+          values = values(tweet_ln_raster),
+          title = 'Cerchi: Tweets Lega',
+          layerId = "circlelegend"
+        )
+    } else if (input$chooseCircleParty == "Movimento 5 Stelle") {
+      mapProxy <- mapProxy %>% addCircles(
+        data = tcoords_m5s,
+        lng = ~xcoord,
+        lat = ~ycoord,
+        radius = sqrt(tcoords_m5s[,"TWEETS_M5S"])*65,
+        stroke = T, weight = 1,
+        opacity = 1,
+        fillOpacity = 0.65,
+        color=~tweet_m5s_pal(TWEETS_M5S),
+        group="circles"
+      ) %>%
+        addLegend(
+          pal = tweet_m5s_pal,
+          position = 'topright',
+          values = values(tweet_m5s_raster),
+          title = 'Cerchi: Tweets Movimento 5 Stelle',
+          layerId = "circlelegend"
+        )
+    } else if (input$chooseCircleParty == "Partito Democratico") {
+      mapProxy <- mapProxy %>% addCircles(
+        data = tcoords_pd,
+        lng = ~xcoord,
+        lat = ~ycoord,
+        radius = sqrt(tcoords_pd[,"TWEETS_PD"])*65,
+        stroke = T, weight = 1,
+        opacity = 1,
+        fillOpacity = 0.65,
+        color=~tweet_pd_pal(TWEETS_PD),
+        group="circles"
+      ) %>%
+        addLegend(
+          pal = tweet_pd_pal,
+          position = 'topright',
+          values = values(tweet_pd_raster),
+          title = 'Cerchi: Tweets Partito Democratico',
+          layerId = "circlelegend"
+        )
+    }
+  }
+})
+
+# Update leaflet based on raster data selection
+observeEvent({
+  input$chooseRasterData
+  input$chooseRasterParty
+}, {
+  mapProxy <- leafletProxy("map") %>% removeControl("rasterlegend") %>% clearImages()
+  if (input$chooseRasterData == "Nessuno") {
+    
+  } else if (input$chooseRasterData == "Popolazione") {
+    mapProxy <- mapProxy %>% 
+      addRasterImage(
+        population_raster,
+        colors = population_pal,
+        opacity = .8,
+        project = F
+      ) %>%
+      addLegend(
+        pal = population_pal,
+        position = 'bottomright',
+        values = values(population_raster),
+        title = 'Sfumato: Popolazione',
+        layerId = "rasterlegend"
+      )
+  } else if (input$chooseRasterData == "Utenti") {
+    if (input$chooseRasterParty == "Totale") {
+      mapProxy <- mapProxy %>% 
+        addRasterImage(
+          user_tot_raster,
+          colors = user_tot_pal,
+          opacity = .8,
+          project = F
+        ) %>%
+        addLegend(
+          pal = user_tot_pal,
+          position = 'bottomright',
+          values = values(user_tot_raster),
+          title = 'Sfumato: Utenti Totale',
+          layerId = "rasterlegend"
+        )
+    } else if (input$chooseRasterParty == "Forza Italia") {
+      mapProxy <- mapProxy %>% 
+        addRasterImage(
+          user_fi_raster,
+          colors = user_fi_pal,
+          opacity = .8,
+          project = F
+        ) %>%
+        addLegend(
+          pal = user_fi_pal,
+          position = 'bottomright',
+          values = values(user_fi_raster),
+          title = 'Sfumato: Utenti Forza Italia',
+          layerId = "rasterlegend"
+        )
+    } else if (input$chooseRasterParty == "Fratelli d'Italia") {
+      mapProxy <- mapProxy %>% 
+        addRasterImage(
+          user_fdi_raster,
+          colors = user_fdi_pal,
+          opacity = .8,
+          project = F
+        ) %>%
+        addLegend(
+          pal = user_fdi_pal,
+          position = 'bottomright',
+          values = values(user_fdi_raster),
+          title = "Sfumato: Utenti Fratelli d'Italia",
+          layerId = "rasterlegend"
+        )
+    } else if (input$chooseRasterParty == "Lega") {
+      mapProxy <- mapProxy %>% 
+        addRasterImage(
+          user_ln_raster,
+          colors = user_ln_pal,
+          opacity = .8,
+          project = F
+        ) %>%
+        addLegend(
+          pal = user_ln_pal,
+          position = 'bottomright',
+          values = values(user_ln_raster),
+          title = 'Sfumato: Utenti Lega',
+          layerId = "rasterlegend"
+        )
+    } else if (input$chooseRasterParty == "Movimento 5 Stelle") {
+      mapProxy <- mapProxy %>% 
+        addRasterImage(
+          user_m5s_raster,
+          colors = user_m5s_pal,
+          opacity = .8,
+          project = F
+        ) %>%
+        addLegend(
+          pal = user_m5s_pal,
+          position = 'bottomright',
+          values = values(user_m5s_raster),
+          title = 'Sfumato: Utenti Movimento 5 Stelle',
+          layerId = "rasterlegend"
+        )
+    } else if (input$chooseRasterParty == "Partito Democratico") {
+      mapProxy <- mapProxy %>%
+        addRasterImage(
+          user_pd_raster,
+          colors = user_pd_pal,
+          opacity = .8,
+          project = F
+        ) %>%
+        addLegend(
+          pal = user_pd_pal,
+          position = 'bottomright',
+          values = values(user_pd_raster),
+          title = 'Sfumato: Utenti Partito Democratico',
+          layerId = "rasterlegend"
+        )
+    }
+  } else if (input$chooseRasterData == "Tweets") {
+    if (input$chooseRasterParty == "Totale") {
+      mapProxy <- mapProxy %>%
+        addRasterImage(
+          tweet_tot_raster,
+          colors = tweet_tot_pal,
+          opacity = .8,
+          project = F
+        ) %>%
+        addLegend(
+          pal = tweet_tot_pal,
+          position = 'bottomright',
+          values = values(tweet_tot_raster),
+          title = 'Sfumato: Tweets Totale',
+          layerId = "rasterlegend"
+        )
+    } else if (input$chooseRasterParty == "Forza Italia") {
+      mapProxy <- mapProxy %>% 
+        addRasterImage(
+          tweet_fi_raster,
+          colors = tweet_fi_pal,
+          opacity = .8,
+          project = F
+        ) %>%
+        addLegend(
+          pal = tweet_fi_pal,
+          position = 'bottomright',
+          values = values(tweet_fi_raster),
+          title = 'Sfumato: Tweets Forza Italia',
+          layerId = "rasterlegend"
+        )
+    } else if (input$chooseRasterParty == "Fratelli d'Italia") {
+      mapProxy <- mapProxy %>%
+        addRasterImage(
+          tweet_fdi_raster,
+          colors = tweet_fdi_pal,
+          opacity = .8,
+          project = F
+        ) %>%
+        addLegend(
+          pal = tweet_fdi_pal,
+          position = 'bottomright',
+          values = values(tweet_fdi_raster),
+          title = "Sfumato: Tweets Fratelli d'Italia",
+          layerId = "rasterlegend"
+        )
+    } else if (input$chooseRasterParty == "Lega") {
+      mapProxy <- mapProxy %>%
+        addRasterImage(
+          tweet_ln_raster,
+          colors = tweet_ln_pal,
+          opacity = .8,
+          project = F
+        ) %>%
+        addLegend(
+          pal = tweet_ln_pal,
+          position = 'bottomright',
+          values = values(tweet_ln_raster),
+          title = 'Sfumato: Tweets Lega',
+          layerId = "rasterlegend"
+        )
+    } else if (input$chooseRasterParty == "Movimento 5 Stelle") {
+      mapProxy <- mapProxy %>% 
+        addRasterImage(
+          tweet_m5s_raster,
+          colors = tweet_m5s_pal,
+          opacity = .8,
+          project = F
+        ) %>%
+        addLegend(
+          pal = tweet_m5s_pal,
+          position = 'bottomright',
+          values = values(tweet_m5s_raster),
+          title = 'Sfumato: Tweets Movimento 5 Stelle',
+          layerId = "rasterlegend"
+        )
+    } else if (input$chooseRasterParty == "Partito Democratico") {
+      mapProxy <- mapProxy %>%
+        addRasterImage(
+          tweet_pd_raster,
+          colors = tweet_pd_pal,
+          opacity = .8,
+          project = F
+        ) %>%
+        addLegend(
+          pal = tweet_pd_pal,
+          position = 'bottomright',
+          values = values(tweet_pd_raster),
+          title = 'Sfumato: Tweets Partito Democratico',
+          layerId = "rasterlegend"
+        )
+    }
+  }
+})
+```
+```{r}
+# Draw the leaflet
+leafletOutput("map")
+
+# Add a collapsible overlay panel with cartograms and selection controls
+absolutePanel(id = "controls", class = "panel panel-default", fixed = T,
+              top = 140, left = 9, right = "auto", bottom = "auto",
+              width = 300, height = 'auto', 
+              style = "overflow-y:scroll; max-height: 800px; opacity: 1; style = z-index: 800;",
+              
+              HTML("<button data-toggle='collapse' data-target='#box1' class='btn-block', style='color:#FFFFFF; background-color:#009246;'>selezione</button>"),
+              tags$div(id = 'box1', class="collapse",
+                       selectInput(inputId="chooseMapCartoTwitter", label="Scegli Confini (Dati Twitter):",
+                                   choices=c("Circoscrizioni Senato (Tweets)",
+                                             "Circoscrizioni Senato (Utenti)",
+                                             "Circoscrizioni Camera (Tweets)",
+                                             "Circoscrizioni Camera (Utenti)",
+                                             "Province (Tweets)", "Province (Utenti)"),
+                                   selected = "Circoscrizioni Senato (Tweets)"),
+                       
+                       selectInput(inputId="chooseMapCartoTwitterData",label="Scegli Dati Twitter:",
+                                   choices=c("Popolazione","Totale","FdI","FI","Lega","M5S","PD"),
+                                   selected = "Totale"),
+                       
+                       selectInput(inputId="chooseMapCartoVotes",label="Scegli Confini (Dati Voti):",
+                                   choices=c("Circoscrizioni Senato", "Circoscrizioni Camera"),
+                                   selected = "Circoscrizioni Senato"),
+                       
+                       selectInput(inputId="chooseMapCartoVotesData",label="Scegli Dati Voti:",
+                                   choices=c("Popolazione","Totale","FdI","FI","Lega","M5S","PD"),
+                                   selected = "Totale")
+              ),
+              
+              HTML('<button data-toggle="collapse" data-target="#box2" class="btn-block button2" style="color:#000000; background-color:#FFFAF0;">cartogram (dati twitter)</button>'),
+              tags$div(id = 'box2', class="collapse", 
+                       imageOutput("cartotwitter")),
+              
+              HTML('<button data-toggle="collapse" data-target="#box3" class="btn-block button3" style="color:#FFFFFF; background-color:#ce2b37;">cartogram (dati voti)</button>'),
+              tags$div(id = 'box3', class="collapse", 
+                       imageOutput("cartovotes"))
+)
+```
+```{r, context="server"}
+# Cartograms in the overlay are resized and cropped from main cartograms, stored in cartograms/small
+# Reactively choose cartogram file path based on selection in drop-down panel
+choosemapcarto_t <- reactive({
+  if (input$chooseMapCartoTwitter == "Circoscrizioni Senato (Tweets)") {
+    switch(input$chooseMapCartoTwitterData,
+           "Popolazione"="./data/cartograms/small/carto_sen_pop_small.png",
+           "Totale"="./data/cartograms/small/carto_sen_tot_t_small.png",
+           "FdI"="./data/cartograms/small/carto_sen_fdi_t_small.png",
+           "FI"="./data/cartograms/small/carto_sen_fi_t_small.png",
+           "Lega"="./data/cartograms/small/carto_sen_ln_t_small.png",
+           "M5S"="./data/cartograms/small/carto_sen_m5s_t_small.png",
+           "PD"="./data/cartograms/small/carto_sen_pd_t_small.png")
+  } else if (input$chooseMapCartoTwitter == "Circoscrizioni Camera (Tweets)") {
+    switch(input$chooseMapCartoTwitterData,
+           "Popolazione"="./data/cartograms/small/carto_cam_pop_small.png",
+           "Totale"="./data/cartograms/small/carto_cam_tot_t_small.png",
+           "FdI"="./data/cartograms/small/carto_cam_fdi_t_small.png",
+           "FI"="./data/cartograms/small/carto_cam_fi_t_small.png",
+           "Lega"="./data/cartograms/small/carto_cam_ln_t_small.png",
+           "M5S"="./data/cartograms/small/carto_cam_m5s_t_small.png",
+           "PD"="./data/cartograms/small/carto_cam_pd_t_small.png")
+  } else if (input$chooseMapCartoTwitter == "Province (Tweets)") {
+    switch(input$chooseMapCartoTwitterData,
+           "Popolazione"="./data/cartograms/small/carto_pro_pop_small.png",
+           "Totale"="./data/cartograms/small/carto_pro_tot_t_small.png",
+           "FdI"="./data/cartograms/small/carto_pro_fdi_t_small.png",
+           "FI"="./data/cartograms/small/carto_pro_fi_t_small.png",
+           "Lega"="./data/cartograms/small/carto_pro_ln_t_small.png",
+           "M5S"="./data/cartograms/small/carto_pro_m5s_t_small.png",
+           "PD"="./data/cartograms/small/carto_pro_pd_t_small.png")
+  } else if (input$chooseMapCartoTwitter == "Circoscrizioni Senato (Utenti)") {
+    switch(input$chooseMapCartoTwitterData,
+           "Popolazione"="./data/cartograms/small/carto_sen_pop_small.png",
+           "Totale"="./data/cartograms/small/carto_sen_tot_u_small.png",
+           "FdI"="./data/cartograms/small/carto_sen_fdi_u_small.png",
+           "FI"="./data/cartograms/small/carto_sen_fi_u_small.png",
+           "Lega"="./data/cartograms/small/carto_sen_ln_u_small.png",
+           "M5S"="./data/cartograms/small/carto_sen_m5s_u_small.png",
+           "PD"="./data/cartograms/small/carto_sen_pd_u_small.png")
+  } else if (input$chooseMapCartoTwitter == "Circoscrizioni Camera (Utenti)") {
+    switch(input$chooseMapCartoTwitterData,
+           "Popolazione"="./data/cartograms/small/carto_cam_pop_small.png",
+           "Totale"="./data/cartograms/small/carto_cam_tot_u_small.png",
+           "FdI"="./data/cartograms/small/carto_cam_fdi_u_small.png",
+           "FI"="./data/cartograms/small/carto_cam_fi_u_small.png",
+           "Lega"="./data/cartograms/small/carto_cam_ln_u_small.png",
+           "M5S"="./data/cartograms/small/carto_cam_m5s_u_small.png",
+           "PD"="./data/cartograms/small/carto_cam_pd_u_small.png")
+  } else if (input$chooseMapCartoTwitter == "Province (Utenti)") {
+    switch(input$chooseMapCartoTwitterData,
+           "Popolazione"="./data/cartograms/small/carto_pro_pop_small.png",
+           "Totale"="./data/cartograms/small/carto_pro_tot_u_small.png",
+           "FdI"="./data/cartograms/small/carto_pro_fdi_u_small.png",
+           "FI"="./data/cartograms/small/carto_pro_fi_u_small.png",
+           "Lega"="./data/cartograms/small/carto_pro_ln_u_small.png",
+           "M5S"="./data/cartograms/small/carto_pro_m5s_u_small.png",
+           "PD"="./data/cartograms/small/carto_pro_pd_u_small.png")
+  }
+})
+
+# Reactively choose cartogram file path based on selection in drop-down panel
+choosemapcarto_v <- reactive({
+  if (input$chooseMapCartoVotes == "Circoscrizioni Senato") {
+    switch(input$chooseMapCartoVotesData,
+           "Popolazione"="./data/cartograms/small/carto_sen_pop_small.png",
+           "Totale"="./data/cartograms/small/carto_sen_tot_v_small.png",
+           "FdI"="./data/cartograms/small/carto_sen_fdi_v_small.png",
+           "FI"="./data/cartograms/small/carto_sen_fi_v_small.png",
+           "Lega"="./data/cartograms/small/carto_sen_ln_v_small.png",
+           "M5S"="./data/cartograms/small/carto_sen_m5s_v_small.png",
+           "PD"="./data/cartograms/small/carto_sen_pd_v_small.png")
+  } else if (input$chooseMapCartoVotes == "Circoscrizioni Camera") {
+    switch(input$chooseMapCartoVotesData,
+           "Popolazione"="./data/cartograms/small/carto_cam_pop_small.png",
+           "Totale"="./data/cartograms/small/carto_cam_tot_v_small.png",
+           "FdI"="./data/cartograms/small/carto_cam_fdi_v_small.png",
+           "FI"="./data/cartograms/small/carto_cam_fi_v_small.png",
+           "Lega"="./data/cartograms/small/carto_cam_ln_v_small.png",
+           "M5S"="./data/cartograms/small/carto_cam_m5s_v_small.png",
+           "PD"="./data/cartograms/small/carto_cam_pd_v_small.png")
+  }
+})
+
+# Assign cartogram outputs
+output$cartotwitter <- renderImage(list(src = choosemapcarto_t(), width = "100%", height = 375), 
+                                   deleteFile = F)
+output$cartovotes <- renderImage(list(src = choosemapcarto_v(), width = "100%", height = 375), 
+                                 deleteFile = F)
+```
+
+
+Cartogram {data-orientation=rows}
+===========================================================================
+```{r}
+# Script for creating cartograms is ./scripts/cartograms.r
+```
+
+Row {data-height=100}
+---------------------------------------------------------------------------
+
+```{r}
+# Inputs are in styled div() to place them laterally in a row
+
+div(style='display:inline-block',
+    selectInput(inputId="chooseCartoTwitter", label="Scegli Confini (Dati Twitter):",
+                choices=c("Circoscrizioni Senato (Tweets)", "Circoscrizioni Senato (Utenti)",
+                          "Circoscrizioni Camera (Tweets)", "Circoscrizioni Camera (Utenti)",
+                          "Province (Tweets)", "Province (Utenti)"),
+                selected = "Circoscrizioni Senato (Tweets)"))
+
+div(style='display:inline-block',
+    selectInput(inputId="chooseCartoTwitterData",label="Scegli Dati Twitter:",
+                choices=c("Popolazione","Totale","FdI","FI","Lega","M5S","PD"),
+                selected = "Totale"))
+
+div(style='display:inline-block',
+    selectInput(inputId="chooseCartoVotes",label="Scegli Confini (Dati Voti):",
+                choices=c("Circoscrizioni Senato", "Circoscrizioni Camera"),
+                selected = "Circoscrizioni Senato"))
+
+div(style='display:inline-block',
+    selectInput(inputId="chooseCartoVotesData",label="Scegli Dati Voti:",
+                choices=c("Popolazione","Totale","FdI","FI","Lega","M5S","PD"),
+                selected = "Totale"))
+```
+```{r, context="server"}
+# choosecarto_t and choosecarto_v are identical to choosemapcarto _t and _v in leaflet overlay
+choosecarto_t <- reactive({
+  if (input$chooseCartoTwitter == "Circoscrizioni Senato (Tweets)") {
+    switch(input$chooseCartoTwitterData,
+           "Popolazione"="./data/cartograms/carto_sen_pop.png",
+           "Totale"="./data/cartograms/carto_sen_tot_t.png",
+           "FdI"="./data/cartograms/carto_sen_fdi_t.png",
+           "FI"="./data/cartograms/carto_sen_fi_t.png",
+           "Lega"="./data/cartograms/carto_sen_ln_t.png",
+           "M5S"="./data/cartograms/carto_sen_m5s_t.png",
+           "PD"="./data/cartograms/carto_sen_pd_t.png")
+  } else if (input$chooseCartoTwitter == "Circoscrizioni Camera (Tweets)") {
+    switch(input$chooseCartoTwitterData,
+           "Popolazione"="./data/cartograms/carto_cam_pop.png",
+           "Totale"="./data/cartograms/carto_cam_tot_t.png",
+           "FdI"="./data/cartograms/carto_cam_fdi_t.png",
+           "FI"="./data/cartograms/carto_cam_fi_t.png",
+           "Lega"="./data/cartograms/carto_cam_ln_t.png",
+           "M5S"="./data/cartograms/carto_cam_m5s_t.png",
+           "PD"="./data/cartograms/carto_cam_pd_t.png")
+  } else if (input$chooseCartoTwitter == "Province (Tweets)") {
+    switch(input$chooseCartoTwitterData,
+           "Popolazione"="./data/cartograms/carto_pro_pop.png",
+           "Totale"="./data/cartograms/carto_pro_tot_t.png",
+           "FdI"="./data/cartograms/carto_pro_fdi_t.png",
+           "FI"="./data/cartograms/carto_pro_fi_t.png",
+           "Lega"="./data/cartograms/carto_pro_ln_t.png",
+           "M5S"="./data/cartograms/carto_pro_m5s_t.png",
+           "PD"="./data/cartograms/carto_pro_pd_t.png")
+  } else if (input$chooseCartoTwitter == "Circoscrizioni Senato (Utenti)") {
+    switch(input$chooseCartoTwitterData,
+           "Popolazione"="./data/cartograms/carto_sen_pop.png",
+           "Totale"="./data/cartograms/carto_sen_tot_u.png",
+           "FdI"="./data/cartograms/carto_sen_fdi_u.png",
+           "FI"="./data/cartograms/carto_sen_fi_u.png",
+           "Lega"="./data/cartograms/carto_sen_ln_u.png",
+           "M5S"="./data/cartograms/carto_sen_m5s_u.png",
+           "PD"="./data/cartograms/carto_sen_pd_u.png")
+  } else if (input$chooseCartoTwitter == "Circoscrizioni Camera (Utenti)") {
+    switch(input$chooseCartoTwitterData,
+           "Popolazione"="./data/cartograms/carto_cam_pop.png",
+           "Totale"="./data/cartograms/carto_cam_tot_u.png",
+           "FdI"="./data/cartograms/carto_cam_fdi_u.png",
+           "FI"="./data/cartograms/carto_cam_fi_u.png",
+           "Lega"="./data/cartograms/carto_cam_ln_u.png",
+           "M5S"="./data/cartograms/carto_cam_m5s_u.png",
+           "PD"="./data/cartograms/carto_cam_pd_u.png")
+  } else if (input$chooseCartoTwitter == "Province (Utenti)") {
+    switch(input$chooseCartoTwitterData,
+           "Popolazione"="./data/cartograms/carto_pro_pop.png",
+           "Totale"="./data/cartograms/carto_pro_tot_u.png",
+           "FdI"="./data/cartograms/carto_pro_fdi_u.png",
+           "FI"="./data/cartograms/carto_pro_fi_u.png",
+           "Lega"="./data/cartograms/carto_pro_ln_u.png",
+           "M5S"="./data/cartograms/carto_pro_m5s_u.png",
+           "PD"="./data/cartograms/carto_pro_pd_u.png")
+  }
+})
+
+choosecarto_v <- reactive({
+  if (input$chooseCartoVotes == "Circoscrizioni Senato") {
+    switch(input$chooseCartoVotesData,
+           "Popolazione"="./data/cartograms/carto_sen_pop.png",
+           "Totale"="./data/cartograms/carto_sen_tot_v.png",
+           "FdI"="./data/cartograms/carto_sen_fdi_v.png",
+           "FI"="./data/cartograms/carto_sen_fi_v.png",
+           "Lega"="./data/cartograms/carto_sen_ln_v.png",
+           "M5S"="./data/cartograms/carto_sen_m5s_v.png",
+           "PD"="./data/cartograms/carto_sen_pd_v.png")
+  } else if (input$chooseCartoVotes == "Circoscrizioni Camera") {
+    switch(input$chooseCartoVotesData,
+           "Popolazione"="./data/cartograms/carto_cam_pop.png",
+           "Totale"="./data/cartograms/carto_cam_tot_v.png",
+           "FdI"="./data/cartograms/carto_cam_fdi_v.png",
+           "FI"="./data/cartograms/carto_cam_fi_v.png",
+           "Lega"="./data/cartograms/carto_cam_ln_v.png",
+           "M5S"="./data/cartograms/carto_cam_m5s_v.png",
+           "PD"="./data/cartograms/carto_cam_pd_v.png")
+  }
+})
+
+# Observer reads carto selections, concatenates images to a temporary file, and stores file path in choosecarto()
+choosecarto <- reactiveVal()
+
+observe({
+  img1 <- readPNG(choosecarto_t())
+  img2 <- readPNG(choosecarto_v())
+  carto.file <- tempfile(pattern = "tempcarto", tmpdir = './data/temp', fileext='_small.png')
+  png(filename=carto.file, width=1200,height=720, units="px", pointsize = 72, bg="transparent")
+  par(mai=rep(0,4),bg="transparent")
+  layout(matrix(c(1,2),ncol=2))
+  plot(NA,xlim=0:1,ylim=0:1,bty="n",axes=0,xaxs = 'i',yaxs='i', bg="transparent")
+  rasterImage(img1,0,0,1,1, bg="transparent")
+  plot(NA,xlim=0:1,ylim=0:1,bty="n",axes=0,xaxs = 'i',yaxs='i', bg="transparent")
+  rasterImage(img2,0,0,1,1, bg="transparent")
+  dev.off()
+  choosecarto(carto.file)
+})
+```
+
+Row {data-height=800}
+---------------------------------------------------------------------------
+
+```{r, context="server"}
+output$carto <- renderImage(list(src = choosecarto()),deleteFile=T)
+```
+```{r}
+imageOutput("carto")
+```
+
+
+Predizioni {data-orientation=rows}
+===========================================================================
+
+Sidebar {.sidebar data-width=500}
+---------------------------------------------------------------------------
+
+### Selezioni
+```{r}
+selectInput("chooseHouse",label="Scegli Risultati (Senato/Camera):",
+            choices = c("Senato","Camera"), selected = "Senato")
+
+selectInput("chooseAggregation", label="Scegli Aggregazione:",
+            choices = c("Partito", "Coalizione"), selected = "Partito")
+```
+
+### Predizioni
+Predictions are based on the proportion of users or tweets associated with each party, based on 99.154 users from an aggregation of the 100 prediction models which minimized error when measured against the Termometro Politico 12-16 Feb 2018 poll (4500 participants).
+
+In each model, users are classified by party using PageSpace and clustering algorithms trained on the timelines of 245.942 unique users active between April 2010 and 3 March 2018.
+
+To produce predictions for unclassified parties, total numbers of users and tweets are rescaled to accommodate the proportion of voters identified for those parties by the poll. For coalition predictions, those poll-based estimates for unclassified parties are added to the twitter data for their respective coalitions.
+
+You can see the geographical distribution of tweets with [cartograms](#section-cartogram), dots, and shading on the [map](#section-mappa). In [Interazioni](#section-interazioni), you can explore the networks of interactions between Twitter users.
+
+Row {.tabset}
+---------------------------------------------------------------------------
+
+### Risultati (Ministero dell'Interno)
+
+```{r, context="server"}
+# Values are taken from Ministero dell'Interno
+chooseresults <- reactive({
+  if (input$chooseHouse == "Senato") {
+    switch(input$chooseAggregation,
+           "Partito" = data.frame(id = c("Lega","Forza Italia","Fratelli d'Italia","Movimento 5 Stelle",
+                                         "Partito Democratico","Altri"),
+                                  value = c(5321537,4358004,1286606,9733928,5783360,4627126),
+                                  color = c("#559B46",'#33AFFF','#0B3B6A','#EED924','#EA171F','#A7A7A7')),
+           "Coalizione" = data.frame(id = c("Destra (Lega, FI, FdI, NcI-UdC)","Movimento 5 Stelle",
+                                            "Sinistra (PD, +E, I, CP, SVP-PATT, VdA)", "Altri"),
+                                     value = c(11327549,9733928,6947199,3101885),
+                                     color = c('#33AFFF','#EED924','#EA171F','#A7A7A7')))
+  } else if (input$chooseHouse == "Camera") {
+    switch(input$chooseAggregation,
+           "Partito" = data.frame(id = c("Lega","Forza Italia","Fratelli d'Italia","Movimento 5 Stelle",
+                                         "Partito Democratico","Altri"),
+                                  value = c(5698687,4596956,1429550,10732066,6161896,4221872),
+                                  color = c("#559B46",'#33AFFF','#0B3B6A','#EED924','#EA171F','#A7A7A7')),
+           "Coalizione" = data.frame(id = c("Destra (Lega, FI, FdI, NcI-UdC)","Movimento 5 Stelle",
+                                            "Sinistra (PD, +E, I, CP, SVP-PATT)", "Altri"),
+                                     value = c(12152345,10732066,7506723,2479143),
+                                     color = c('#33AFFF','#EED924','#EA171F','#A7A7A7')))
+  }
+})
+
+output$resultpie <- renderPlotly({
+  plot_ly(data=chooseresults(),
+          labels = ~id, values = ~value, textposition="inside",
+          textinfo = "label+percent", insidetextfont = list(color = "#FFFFFF"),
+          hoverinfo = "text", text = ~paste(value, "voti"),
+          marker = ~list(colors = color, line = list(color = "#FFFFFF", width = 1)),
+          showlegend = F) %>%
+          add_pie(hole=0.5)  %>%
+    layout(title = paste("Risultati 4 March 2018",input$chooseHouse,sep=' - '),
+           font=list(family="sans serif"),
+           xaxis = list(showgrid = F, zeroline = F, showticklabels = F),
+           yaxis = list(showgrid = F, zeroline = F, showticklabels = F))
+})
+```
+
+```{r}
+plotlyOutput("resultpie")
+```
+
+
+### Sondaggio (Termometro Politico 12-16 Feb 2018)
+
+```{r, context="server"}
+# Values taken from Wikipedia article "Opinion polling for the Italian general election, 2018"
+output$pollpie <- renderPlotly({
+  if (input$chooseAggregation == "Partito") {
+    plot_ly(data = data.frame(id = c("Lega","Forza Italia","Fratelli d'Italia","Movimento 5 Stelle",
+                                     "Partito Democratico","Altri"),
+                              value = c(14.8,15.9,5,26.3,21.3,16.7),
+                              color = c("#559B46",'#33AFFF','#0B3B6A','#EED924','#EA171F','#A7A7A7')),
+            labels = ~id, values = ~value, hoverinfo = "text", text = ~paste(value,"%"),
+            textposition="inside", textinfo = "label+percent", insidetextfont = list(color = "#FFFFFF"),
+            marker = ~list(colors = color, line = list(color = "#FFFFFF", width = 1)),
+            showlegend = F) %>%
+            add_pie(hole=0.5)  %>%
+      layout(title = "Risultati Sondaggio (Partito)",
+             font=list(family="sans serif"),
+             xaxis = list(showgrid = F, zeroline = F, showticklabels = F),
+             yaxis = list(showgrid = F, zeroline = F, showticklabels = F))
+  } else if (input$chooseAggregation == "Coalizione") {
+    plot_ly(data = data.frame(id = c("Destra (Lega, FI, FdI, NcI)","M5S",
+                                     "Sinistra (PD, +E, I, CP)","Altri"),
+                              value = c(37.5,26.3,25.9,10.3),
+                              color = c('#33AFFF','#EED924','#EA171F','#A7A7A7')),
+            labels = ~id, values = ~value, hoverinfo = 'text', text = ~paste(value,'%'),
+            textposition="inside", textinfo = "label+percent", insidetextfont = list(color = "#FFFFFF"),
+            marker = ~list(colors = color, line = list(color = "#FFFFFF", width = 1)),
+            showlegend = F) %>%
+            add_pie(hole=0.5)  %>%
+      layout(title = "Risultati Sondaggio (Coalizione)",
+             font=list(family="sans serif"),
+             xaxis = list(showgrid = F, zeroline = F, showticklabels = F),
+             yaxis = list(showgrid = F, zeroline = F, showticklabels = F))
+  }
+})
+```
+
+```{r}
+plotlyOutput("pollpie")
+```
+
+
+
+Row {.tabset}
+---------------------------------------------------------------------------
+
+```{r}
+# Estimates for parties not included in our models are taken from the poll.
+# Tweets or users identified by models are considered as (100 pct - pct of vote predicted by poll for unidentified parties) percent of the new total.
+# Numbers for unidentified parties are then calculated as the % predicted by the poll of the new total
+```
+
+### Predizione (Utenti di Twitter)
+
+```{r, context="server"}
+output$userpie <- renderPlotly({
+  if (input$chooseAggregation == "Partito") {
+    plot_ly(data=rbind(partynodes[partynodes$type == "num_users",c("id","value","color")],
+                       data.frame(id="Altri",value=19878,color="#A7A7A7")),
+            labels = ~id, values = ~value, textposition="inside",
+            textinfo = "label+percent", insidetextfont = list(color = "#FFFFFF"),
+            hoverinfo = "text", text = ~paste(value, "utenti"),
+            marker = ~list(colors = color, line = list(color = "#FFFFFF", width = 1)),
+            showlegend = F) %>%
+            add_pie(hole=0.5)  %>%
+      layout(title = "Utenti di Twitter per Partito",
+             font=list(family="sans serif"),
+             xaxis = list(showgrid = F, zeroline = F, showticklabels = F),
+             yaxis = list(showgrid = F, zeroline = F, showticklabels = F))
+  } else if (input$chooseAggregation == "Coalizione") {
+    plot_ly(data = data.frame(id = c("Destra (Lega, FI, FdI)","Movimento 5 Stelle",
+                                     "Sinistra (PD, +E, I, CP)","Altri"),
+                              value = c(44672,35217,26883,12260),
+                              # Total users rescaled to 119032, NcI, +E, I, CP, & others added to 
+                              # respective categories by proportion
+                              color = c('#33AFFF','#EED924','#EA171F','#A7A7A7')),
+            labels = ~id, values = ~value, textposition="inside",
+            textinfo = "label+percent", insidetextfont = list(color = "#FFFFFF"),
+            hoverinfo = "text", text = ~paste(value, "utenti"),
+            marker = ~list(colors = color, line = list(color = "#FFFFFF", width = 1)),
+            showlegend = F) %>%
+            add_pie(hole=0.5)  %>%
+      layout(title = "Utenti di Twitter per Partito",
+             font=list(family="sans serif"),
+             xaxis = list(showgrid = F, zeroline = F, showticklabels = F),
+             yaxis = list(showgrid = F, zeroline = F, showticklabels = F))
+  }
+})
+```
+
+```{r}
+plotlyOutput("userpie")
+```
+
+### Predizione (Numeri di Tweets)
+
+```{r, context="server"}
+output$tweetpie <- renderPlotly({
+  if (input$chooseAggregation == "Partito") {
+    plot_ly(data=rbind(partynodes[partynodes$type == "num_tweets",c("id","value","color")],
+                       data.frame(id='Altri',value=3425217,color='#A7A7A7')),
+            labels = ~id, values = ~value, textposition="inside",
+            textinfo = "label+percent", insidetextfont = list(color = "#FFFFFF"),
+            hoverinfo = "text", text = ~paste(value, "tweets"),
+            marker = ~list(colors = color, line = list(color = "#FFFFFF", width = 1)),
+            showlegend = F) %>%
+            add_pie(hole=0.5)  %>%
+      layout(title = "Numeri di Tweets per Partito",
+             font=list(family="sans serif"),
+             xaxis = list(showgrid = F, zeroline = F, showticklabels = F),
+             yaxis = list(showgrid = F, zeroline = F, showticklabels = F))
+  } else if (input$chooseAggregation == "Coalizione") {
+    plot_ly(data = data.frame(id = c("Destra (Lega, FI, FdI, NcI)","Movimento 5 Stelle",
+                                     "Sinistra (PD, +E, I, CP)",'Altri'),
+                              value = c(7476689,6311870,4615562,2122859),
+                              # Total tweets rescaled to 20610280, NcI, +E, I, & CP & others added to 
+                              # respective categories by proportion
+                              color = c('#33AFFF','#EED924','#EA171F','#A7A7A7')),
+            labels = ~id, values = ~value, textposition="inside",
+            textinfo = "label+percent", insidetextfont = list(color = "#FFFFFF"),
+            hoverinfo = "text", text = ~paste(value, "tweets"),
+            marker = ~list(colors = color, line = list(color = "#FFFFFF", width = 1)),
+            showlegend = F) %>%
+            add_pie(hole=0.5)  %>%
+      layout(title = "Numeri di Tweets per Partito",
+             font=list(family="sans serif"),
+             xaxis = list(showgrid = F, zeroline = F, showticklabels = F),
+             yaxis = list(showgrid = F, zeroline = F, showticklabels = F))
+  }
+})
+```
+
+```{r}
+plotlyOutput("tweetpie")
+```
+
+
+
+Interazioni {data-orientation=columns}
+===========================================================================
+
+Sidebar {.sidebar data-width=500}
+---------------------------------------------------------------------------
+
+Edges are always drawn in the direction of information transfer:
+
+replier -> reply receiver
+
+quoted -> quoter
+
+mentioner -> mentioned
+
+### Selezioni
+
+Choose which interaction is shown in the network graph (and barplot, when degree data are selected)
+```{r}
+selectInput(inputId="chooseNet",label="Connessione:",choices=c("Risposta","Citazione","Menzione"),selected="Risposta")
+```
+
+Choose node size and barplot data
+```{r}
+selectInput(inputId="chooseNodesize",label="Dati:",choices=c("Number of Users",
+                                                             "Number of Tweets",
+                                                             "Number of Votes (Camera)",
+                                                             "Number of Votes (Senato)",
+                                                             "In-Degree",
+                                                             "Out-Degree"),
+            selected="Number of Users")
+```
+
+```{r, context="server"}
+# The edge list contains an extra column "type" which denotes the type of interaction
+choosepartyedges <- reactive({
+  switch(input$chooseNet,
+         "Risposta"=partyedges[partyedges$type == "reply",c('from','to','value','title')],
+         "Citazione"=partyedges[partyedges$type == "quote",c('from','to','value','title')],
+         "Menzione"=partyedges[partyedges$type == "mention",c('from','to','value','title')])
+})
+
+# The node list also has column "type" denoting how nodesize (called 'value') is calculated.
+# When nodesize is determined by degree, data is selected based on type of interaction displayed
+choosepartynodes <- reactive({
+  if (input$chooseNodesize == "Number of Users") {
+    partynodes[partynodes$type == "num_users",c('id','value','color','label','title')]
+  } else if (input$chooseNodesize == "Number of Tweets") {
+    partynodes[partynodes$type == "num_tweets",c('id','value','color','label','title')]
+  } else if (input$chooseNodesize == "Number of Votes (Camera)") {
+    partynodes[partynodes$type == "num_votes_c",c('id','value','color','label','title')]
+  } else if (input$chooseNodesize == "Number of Votes (Senato)") {
+    partynodes[partynodes$type == "num_votes_s",c('id','value','color','label','title')]
+  } else if (input$chooseNodesize == "In-Degree") {
+    switch(input$chooseNet,
+           "Risposta"=partynodes[partynodes$type == "in_deg_reply",
+                                c('id','value','color','label','title')],
+           "Citazione"=partynodes[partynodes$type == "in_deg_quote",
+                                  c('id','value','color','label','title')],
+           "Menzione"=partynodes[partynodes$type == "in_deg_mention",
+                                 c('id','value','color','label','title')])
+  } else if (input$chooseNodesize == "Out-Degree") {
+    switch(input$chooseNet,
+           "Risposta"=partynodes[partynodes$type == "out_deg_reply",
+                                c('id','value','color','label','title')],
+           "Citazione"=partynodes[partynodes$type == "out_deg_quote",
+                                  c('id','value','color','label','title')],
+           "Menzione"=partynodes[partynodes$type == "out_deg_mention",
+                                 c('id','value','color','label','title')])
+  }
+})
+```
+
+### Partiti
+```{r, context="server"}
+# Simple barplot shows ranking of parties for data selected in network
+output$barplot <- renderPlotly({
+  plot_ly(choosepartynodes(), x = ~id, y = ~value, type="bar") %>%
+    layout(xaxis = list(title = "", tickangle = -45),
+           yaxis = list(title = "Valore"),
+           margin = list(b = 100))
+})
+```
+```{r}
+plotlyOutput("barplot")
+```
+
+Column {data-width=600}
+---------------------------------------------------------------------------
+
+### Rete
+```{r}
+visNetworkOutput("partynet")
+```
+```{r, context="server"}
+output$partynet <- renderVisNetwork({
+visNetwork(choosepartynodes(),choosepartyedges(),main=paste("Rete di",input$chooseNet)) %>%
+    visLayout(improvedLayout = F) %>% visEdges(smooth=T,length=150) %>% visNodes(mass = 4) %>%
+    visInteraction(navigationButtons=T,hover=T) %>%
+    visOptions(highlightNearest = list(enabled=T,hover=T))
+})
+```
+
+
+Dati Twitter e Voti per Circoscrizione {data-navmenu="Background" data-orientation=columns}
+===========================================================================
+```{r}
+# Data loaded in "Twitter / Voting Data Tables" section of r data chunk
+```
+
+Column {.tabset data-width=850}
+---------------------------------------------------------------------------
+
+### Senato (Voti)
+
+```{r}
+knitr::kable(circosen_df[,c(1,8:13)],
+             row.names = ,
+             col.names = c('Popolazione 2011','Voti FdI','Voti FI',
+                           'Voti Lega','Voti M5S','Voti PD',
+                           'Voti Totale'))
+
+```
+
+
+### Senato (Utenti)
+
+```{r}
+knitr::kable(circosen_df[,c(1,19,18,17,16,15,14)],
+             col.names = c('Popolazione 2011','Utenti FdI','Utenti FI',
+                           'Utenti Lega','Utenti M5S','Utenti PD',
+                           'Utenti Totale'))
+```
+
+### Senato (Tweets)
+
+```{r}
+knitr::kable(circosen_df[,c(1,7,6,5,4,3,2)],
+             col.names = c('Popolazione 2011','Tweets FdI','Tweets FI',
+                           'Tweets Lega','Tweets M5S','Tweets PD',
+                           'Tweets Totale'))
+```
+
+### Camera (Voti)
+
+```{r}
+knitr::kable(circocam_df[,c(1,8:13)],
+             col.names = c('Popolazione 2011','Voti FdI','Voti FI',
+                           'Voti Lega','Voti M5S','Voti PD',
+                           'Voti Totale'))
+```
+
+### Camera (Utenti)
+
+```{r}
+knitr::kable(circocam_df[,c(1,19,18,17,16,15,14)],
+             col.names = c('Popolazione 2011','Utenti FdI','Utenti FI',
+                           'Utenti Lega','Utenti M5S','Utenti PD',
+                           'Utenti Totale'))
+```
+
+### Camera (Tweets)
+
+```{r}
+knitr::kable(circocam_df[,1:7],
+             col.names = c('Popolazione 2011','Tweets FdI','Tweets FI',
+                           'Tweets Lega','Tweets M5S','Tweets PD',
+                           'Tweets Totale'))
+```
+
+Risultati {data-navmenu="Background" data-orientation=rows}
+===========================================================================
+```{r}
+# Data loaded in "Elections Data" piece of r data chunk
+```
+
+Row {data-height=100}
+---------------------------------------------------------------------------
+
+```{r}
+selectInput("chooseSenReg","Regione (Senato):",
+            choices=c("ABRUZZO","AFRICA ASIA OCEANIA ANTARTIDE","AMERICA MERIDIONALE",
+                      "AMERICA SETTENTRIONALE E CENTRALE", "BASILICATA", "CALABRIA",
+                      "CAMPANIA","EMILIA-ROMAGNA","EUROPA","FRIULI-VENEZIA GIULIA",
+                      "LAZIO","LIGURIA","LOMBARDIA","MARCHE","MOLISE","PIEMONTE",
+                      "PUGLIA","SARDEGNA","SICILIA","TOSCANA","TRENTINO-ALTO ADIGE",
+                      "UMBRIA","VALLE D'AOSTA","VENETO"), selected = "ABRUZZO")
+selectInput("chooseCamReg","Regione (Camera):",
+            choices=c("ABRUZZO","AFRICA ASIA OCEANIA ANTARTIDE","AMERICA MERIDIONALE",
+                      "AMERICA SETTENTRIONALE E CENTRALE", "BASILICATA", "CALABRIA",
+                      "CAMPANIA 1","CAMPANIA 2","EMILIA-ROMAGNA","EUROPA","FRIULI-VENEZIA GIULIA",
+                      "LAZIO 1","LAZIO 2","LIGURIA","LOMBARDIA 1","LOMBARDIA 2","LOMBARDIA 3",
+                      "LOMBARDIA 4","MARCHE","MOLISE","PIEMONTE 1","PIEMONTE 2","PUGLIA",
+                      "SARDEGNA","SICILIA 1","SICILIA 2","TOSCANA","TRENTINO-ALTO ADIGE/SUDTIROL",
+                      "UMBRIA","VALLE D'AOSTA","VENETO 1","VENETO 2"), selected = "ABRUZZO")
+```
+```{r, context="server"}
+choosesendata <- reactive({risultati_sen[risultati_sen$Ente == input$chooseSenReg, 2:3]})
+
+choosecamdata <- reactive({risultati_cam[risultati_cam$Ente == input$chooseCamReg, 2:3]})
+```
+[Dati: Dipartimento per gli Affari Interni e Territoriali](http://elezionistorico.interno.gov.it/)
+
+Row {data-height=1200}
+---------------------------------------------------------------------------
+
+### Senato
+```{r, context="server"}
+output$sentable <- DT::renderDataTable({
+  DT::datatable(choosesendata())
+})
+```
+```{r}
+DT::dataTableOutput("sentable")
+```
+
+### Camera
+```{r, context="server"}
+output$camtable <- DT::renderDataTable({
+  DT::datatable(choosecamdata())
+})
+```
+```{r}
+DT::dataTableOutput("camtable")
+```
+
+
+Elezioni Precedenti {data-navmenu="Background" data-orientation=columns}
+===========================================================================
+```{r}
+# Data loaded in "Elections Data" piece of r data chunk
+```
+
+Column {.tabset data-width=600}
+---------------------------------------------------------------------------
+### Affluenza Alle Urne - Senato
+click on legend items to hide/show lines
+```{r}
+pSen <- ggplot(data=EPSregionTurnout,aes(x=Year,y=TurnoutRate,color=RegionCode)) +
+  geom_line() +
+  geom_point() +
+  scale_y_continuous(labels = scales::percent, expand=expand_scale(0,.03)) +
+  scale_color_manual(values=c("VDA"="green","PIE"="deeppink","LOM"="blueviolet","TAA"="darkred","VEN"="darkolivegreen","FVG"="darkmagenta","LIG"="darkkhaki","ERO"="darkgreen","TOS"="darkgoldenrod1","UMB"="cyan","MAR"="cornflowerblue","LAZ"="coral1","ABR"="red","MOL"="blue","CAM"="cadetblue4","PUG"="black","BAS"="brown","CAL"="chartreuse","SIC"="bisque4","SAR"="hotpink")) +
+  ylab("\n") +
+  xlab("Anno") +
+  ggtitle("Elezioni Senato\n Affluenza Alle Urne per Regione\n")
+ggplotly(pSen)
+```
+
+### Affluenza Alle Urne - Camera
+click on legend items to hide/show lines
+```{r}
+pCam <- ggplot(data=EPCregionTurnout,aes(x=Year,y=TurnoutRate,color=RegionCode)) +
+  geom_line() +
+  geom_point() +
+  scale_y_continuous(labels = scales::percent, expand=expand_scale(0,.03)) +
+  scale_color_manual(values=c("VDA"="green","PIE"="deeppink","LOM"="blueviolet","TAA"="darkred","VEN"="darkolivegreen","FVG"="darkmagenta","LIG"="darkkhaki","ERO"="darkgreen","TOS"="darkgoldenrod1","UMB"="cyan","MAR"="cornflowerblue","LAZ"="coral1","ABR"="red","MOL"="blue","CAM"="cadetblue4","PUG"="black","BAS"="brown","CAL"="chartreuse","SIC"="bisque4","SAR"="hotpink")) +
+  ylab(label="\n") +
+  xlab("Anno") +
+  ggtitle("Elezioni Camera\n Affluenza Alle Urne per Regione\n")
+ggplotly(pCam)
+```
+
+### Senato (Elettori/Votanti)
+
+```{r}
+ggplot(EPStotale, aes(x=Year)) +
+  geom_line(aes(y=ElectorateSize),colour="blue",show.legend=T) +
+  geom_line(aes(y=VoterCount),colour="red",show.legend=T) +
+  scale_y_continuous(labels = scales::comma) +
+  ylab(label="Totale") +
+  xlab("Anno") +
+  ggtitle("Elezioni Senato - Elettori/Votanti") +
+  annotate("text",x=2000,y=33000000,label="Elettori: Blu      Votanti: Rosso")
+```
+
+### Senato (Bianchi/Invalide)
+
+```{r}
+ggplot(EPStotale, aes(x=Year)) +
+  geom_line(aes(y=BlankBallots),colour="blue",show.legend=T) +
+  geom_line(aes(y=TotalInvalid),colour="red",show.legend=T) +
+  scale_y_continuous(labels = scales::comma) +
+  ylab(label="Totale") +
+  xlab("Anno") +
+  ggtitle("Elezioni Senato - Bianchi/Invalide") +
+  annotate("text",x=2010,y=3000,label="Schede Bianchi: Blu      Totale Invalide: Rosso")
+```
+
+### Camera (Elettori/Votanti)
+
+```{r}
+ggplot(EPCtotale, aes(x=Year)) +
+  geom_line(aes(y=ElectorateSize),colour="blue",show.legend=T) +
+  geom_line(aes(y=VoterCount),colour="red",show.legend=T) +
+  scale_y_continuous(labels = scales::comma) +
+  ylab(label="Totale") +
+  xlab("Anno") +
+  ggtitle("Elezioni Camera - Elettori/Votanti") +
+  annotate("text",x=2010,y=35000000,label="Elettori: Blu      Votanti: Rosso")
+```
+
+### Camera (Bianchi/Invalide)
+
+```{r}
+ggplot(EPCtotale, aes(x=Year)) +
+  geom_line(aes(y=BlankBallots),colour="blue",show.legend=T) +
+  geom_line(aes(y=TotalInvalid),colour="red",show.legend=T) +
+  scale_y_continuous(labels = scales::comma) +
+  ylab(label="Totale") +
+  xlab("Anno") +
+  ggtitle("Elezioni Camera - Bianchi/Invalide") +
+  annotate("text",x=2010,y=300000,label="Schede Bianchi: Blu      Totale Invalide: Rosso")
+```
+
+Column {vertical_layout:scroll data-width=400}
+---------------------------------------------------------------------------
+[Dati: Dipartimento per gli Affari Interni e Territoriali](http://elezionistorico.interno.gov.it/)
+
+### Codice
+
+```{r}
+knitr::kable(ElezioniPrecedentiCodice)
+```
+
+
+
+
+

@@ -1,0 +1,29 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1552959057240.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "A1D4FBEF",
+    "lastKnownWriteTime" : 1552870262,
+    "last_content_update" : 1552959057240,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "cacheKey" : "63F93FD5",
+        "caption" : "BilateralMigration",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=BilateralMigration&cache_key=63F93FD5",
+        "displayedObservations" : "255380",
+        "environment" : "",
+        "object" : "BilateralMigration",
+        "preview" : "0",
+        "totalObservations" : "255380",
+        "variables" : "8"
+    },
+    "relative_order" : 7,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_dataframe"
+}

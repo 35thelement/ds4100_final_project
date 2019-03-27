@@ -10,7 +10,7 @@ con <- neo4j_api$new(
   password = "neo4j"
 )
 
-# clear the database
+# clear the database if there's anything in it
 call_neo4j("MATCH (n) DETACH DELETE n", con)
 
 ##### Read and modify data with R
@@ -55,7 +55,7 @@ Population <- spread(Population,Population_by_Gender,Pop)
 # Filter Population to only contain data on countries found in BilateralMigration.
 # It is ok if there is migration but not population data for some countries.
 # Since all countries in BilateralMigration are both origins and destinations (run commented line to verify), we only need use one.
-#setdiff(BilateralMigration$Dest_Code), BilateralMigration$Origin_Code)
+#setdiff(BilateralMigration$Dest_Code, BilateralMigration$Origin_Code)
 Population <- Population %>% filter(Country_Code %in% BilateralMigration$Origin_Code)
 
 # IncomeRegion contains rows with missing data.
@@ -85,6 +85,7 @@ IncomeRegion <- IncomeRegion %>% filter(Country_Code %in% Population$Country_Cod
 
 ##### Save modified data to csv
 write.csv(BilateralMigration, file="./data/final/Bilateral_Migration_Final.csv", row.names=F)
+write.csv(BilateralMigration %>% distinct(Origin_Name, Origin_Code), file="./data/final/Country_Final.csv", row.names=F)
 write.csv(Population, file="./data/final/Population_Final.csv", row.names=F)
 write.csv(IncomeRegion, file="./data/final/Income_Region_Final.csv", row.names=F)
 
@@ -92,42 +93,53 @@ write.csv(IncomeRegion, file="./data/final/Income_Region_Final.csv", row.names=F
 # constraints
 send_cypher("./constraints.cypher", con)
 
-# countries, migrations, and years
+# years
+call_neo4j("CREATE (:Year {year: 1960}), (:Year {year: 1970}), (:Year {year: 1980}), (:Year {year: 1990}), (:Year {year: 2000});", con)
+
+# countries
+on_load_country <- 'CREATE (:Country {code: csvLine.Origin_Code, name: csvLine.Origin_Name})'
+
+country_path <- str_c("file://", getwd(), "/data/final/Country_Final.csv")
+
+load_csv(url=country_path, con=con, on_load=on_load_country, as="csvLine", periodic_commit=500)
+
+# migrations
 on_load_mig <- 
-'MERGE (o:Country {code: csvLine.Origin_Code, name: csvLine.Origin_Name})
-MERGE (d:Country {code: csvLine.Dest_Code, name: csvLine.Dest_Name})
-MERGE (y:Year {name: toInteger(csvLine.Year)})
-MERGE (m:Migration {female: toInteger(csvLine.Female), male: toInteger(csvLine.Male), total: toInteger(csvLine.Total)})
+  'MATCH (o:Country {code: csvLine.Origin_Code})
+MATCH (d:Country {code: csvLine.Dest_Code})
+MATCH (y:Year {year: toInteger(csvLine.Year)})
+CREATE (m:Migration {female: toInteger(csvLine.Female), male: toInteger(csvLine.Male), total: toInteger(csvLine.Total)})
 MERGE (o)-[:EMMIGRATION]->(m)-[:IMMIGRATION]->(d)
 MERGE (m)-[:IN_YEAR]->(y);'
 
 mig_path <- str_c("file://", getwd(), "/data/final/Bilateral_Migration_Final.csv")
 
-load_csv(url=mig_path, con=con, on_load=on_load_mig, as="csvLine")
+load_csv(url=mig_path, con=con, on_load=on_load_mig, as="csvLine", periodic_commit=500)
 
 # population
 on_load_pop <-
-'MATCH (c:Country {code: csvLine.Country_Code})
+  'MATCH (c:Country {code: csvLine.Country_Code})
+MATCH (y:Year {year: toInteger(csvLine.Year)})
 MERGE (p:Population {total: toInteger(csvLine.Total)})
 FOREACH(ignoreMe IN CASE WHEN trim(csvLine.Female) <> "" THEN [1] ELSE [] END | SET p.female = toInteger(csvLine.Female))
 FOREACH(ignoreMe IN CASE WHEN trim(csvLine.Male) <> "" THEN [1] ELSE [] END | SET p.male = toInteger(csvLine.Male))
-MATCH (y:Year {name: toInteger(csvLine.Year)})
 MERGE (c)-[:POPULATION]->(p)-[:IN_YEAR]->(y);'
 
 pop_path <- str_c("file://", getwd(),"/data/final/Population_Final.csv")
 
-load_csv(url=pop_path, con=con, on_load=on_load_pop, as="csvLine")
+load_csv(url=pop_path, con=con, on_load=on_load_pop, as="csvLine", periodic_commit=500)
 
 # income and region
 on_load_ir <-
-'MATCH (c:Country {code: csvLine.Country_Code})
-MERGE (c)-[:INCOME]->(:Income {code: csvLine.Income_Code, name: csvLine.Income_Name})
-MERGE (c)-[:REGION]->(:Region {code: csvLine.Income_Code, name: csvLine.Income_Name});'
+  'MATCH (c:Country {code: csvLine.Country_Code})
+MERGE (i:Income {code: csvLine.Income_Code, name: csvLine.Income_Name})
+MERGE (r:Region {code: csvLine.Region_Code, name: csvLine.Region_Name})
+MERGE (c)-[:INCOME]->(i)
+MERGE (c)-[:REGION]->(r);'
 
 ir_path <- str_c("file://", getwd(), "/data/final/Income_Region_Final.csv")
 
-load_csv(url=ir_path, con=con, on_load=on_load_ir, as="csvLine")
+load_csv(url=ir_path, con=con, on_load=on_load_ir, as="csvLine", periodic_commit=500)
 
 # Now that the data is in Neo4j, let's free up some RAM
 rm(BilateralMigration, IncomeRegion, Population)
-

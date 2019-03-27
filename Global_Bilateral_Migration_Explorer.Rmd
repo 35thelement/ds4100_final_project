@@ -109,6 +109,13 @@ con$ping()
 
 Time Series
 ===================================================================================
+```{r}
+year = 2000
+country = 'AFG'
+
+on_choose_year_and_country <- str_c('MATCH (c:Country {code: ', country, '})
+                                    MATCH (y:Year {year: ', year, '})')
+```
 
 
 

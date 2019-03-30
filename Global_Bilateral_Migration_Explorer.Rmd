@@ -110,11 +110,7 @@ con$ping()
 Time Series
 ===================================================================================
 ```{r}
-year = 2000
-country = 'AFG'
-
-on_choose_year_and_country <- str_c('MATCH (c:Country {code: ', country, '})
-                                    MATCH (y:Year {year: ', year, '})')
+call_neo4j("Match (c:Country)<-[:IMMIGRATION]-(m:Migration) return c.name, sum(m.total), sum(m.female), sum(m.male);", con, type = "row", output = "r")
 ```
 
 

@@ -110,7 +110,9 @@ con$ping()
 Time Series
 ===================================================================================
 ```{r}
-call_neo4j("Match (c:Country)<-[:IMMIGRATION]-(m:Migration) return c.name, sum(m.total), sum(m.female), sum(m.male);", con, type = "row", output = "r")
+query <- call_neo4j('match (c:Country)-[:EMMIGRATION]->(m:Migration) return c.name as Name_Of_Country, sum(m.total) as Total_Emigrations, sum(m.male) as Male_Emigrations, sum(m.female) as Female_Emigrations', con)
+
+data.frame(query)
 ```
 
 

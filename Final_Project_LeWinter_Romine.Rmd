@@ -85,7 +85,7 @@ knitr::include_graphics("./GBMDB_model.png")
 After following the setup instructions above, connect to the database:
 ```{r}
 con <- neo4j_api$new(
-  url = "http://localhost:11014",
+  url = "http://localhost:7474",
   user = "neo4j", 
   password = "neo4j"
 )
@@ -291,6 +291,16 @@ rm(BilateralMigration, IncomeRegion, Population)
 ```
 
 # Summary Statistics
+```{r}
+emigrants <- call_neo4j('MATCH (c:Country)-[:EMMIGRATION]->(m:Migration) RETURN c.name AS Name, sum(m.total) AS Total_Emigrations, sum(m.male) AS Total_Male_Emigrants, sum(m.female) AS Total_Female_Emigrants', con) %>%
+  data.frame()
+colnames(emigrants) <- c("Country Name", "Total Emigrants", "Total Male Emigrants", "Total Female Emigrants")
+immigrants <- call_neo4j('MATCH (c:Country)<-[:IMMIGRATION]-(m:Migration) RETURN c.name AS Name, sum(m.total) AS Total_Immigrations, sum(m.male) AS Total_Male_Immigrants, sum(m.female) AS Total_Female_Immigrants', con) %>%
+  data.frame()
+colnames(immigrants) <- c("Country Name", "Total Immigrants", "Total Male Immigrants", "Total Female Immigrants")
+merge(emigrants, immigrants)
+```
+
 
 
 

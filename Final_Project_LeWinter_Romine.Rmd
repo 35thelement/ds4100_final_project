@@ -298,7 +298,9 @@ colnames(emigrants) <- c("Country Name", "Total Emigrants", "Total Male Emigrant
 immigrants <- call_neo4j('MATCH (c:Country)<-[:IMMIGRATION]-(m:Migration) RETURN c.name AS Name, sum(m.total) AS Total_Immigrations, sum(m.male) AS Total_Male_Immigrants, sum(m.female) AS Total_Female_Immigrants', con) %>%
   data.frame()
 colnames(immigrants) <- c("Country Name", "Total Immigrants", "Total Male Immigrants", "Total Female Immigrants")
-merge(emigrants, immigrants)
+migration_totals <- merge(emigrants, immigrants)
+ggplot(data = migration_totals) + geom_point(aes(x = `Total Emigrants`, y = `Total Immigrants`))
+ggplot(data = migration_totals) + geom_point(aes(x = `Total Emigrants`, y = `Total Immigrants`))
 ```
 
 

@@ -306,19 +306,19 @@ ggplot(immigrants_income, aes(x = `Year`, y = `Total Immigrants`, fill = `Income
   geom_bar(position = "dodge", stat = "identity")
 ```
 
-Now, let's try and perform a linear regression to predict the number of immigrants and emigrants from each levels of income of countries in 2020:
+
 
 ```{r}
-immigrant_income_linreg <- lm(`Total Immigrants` ~ `Income Level` + Year, immigrants_income)
-emigrant_income_linreg <- lm(`Total Emigrants` ~ `Income Level` + Year, emigrants_income)
-income_levels <- c("Low income", "Lower middle income", "Upper middle income", "High income")
-new_data_income <- data.frame("Income Level" = income_levels, "Year" = rep(2020, 4))
-colnames(new_data_income) <- c("Income Level", "Year")
-summary(immigrant_income_linreg)
-summary(emigrant_income_linreg)
-predictions_2020_income <- data.frame(income_levels, predict(immigrant_income_linreg, new_data_income), predict(emigrant_income_linreg, new_data_income))
-colnames(predictions_2020_income) <- c("Income Level", "Expected Total Immigrants in 2020", "Expected Emigrants in 2020")
-predictions_2020_income
+# immigrant_income_linreg <- lm(`Total Immigrants` ~ `Income Level` + Year, immigrants_income)
+# emigrant_income_linreg <- lm(`Total Emigrants` ~ `Income Level` + Year, emigrants_income)
+# income_levels <- c("Low income", "Lower middle income", "Upper middle income", "High income")
+# new_data_income <- data.frame("Income Level" = income_levels, "Year" = rep(2020, 4))
+# colnames(new_data_income) <- c("Income Level", "Year")
+# summary(immigrant_income_linreg)
+# summary(emigrant_income_linreg)
+# predictions_2020_income <- data.frame(income_levels, predict(immigrant_income_linreg, new_data_income), predict(emigrant_income_linreg, new_data_income))
+# colnames(predictions_2020_income) <- c("Income Level", "Expected Total Immigrants in 2020", "Expected Emigrants in 2020")
+# predictions_2020_income
 ```
 
 Having done that, let's do the same thing again, except this time we'll be looking at migration by countries' regions instead of their income levels:
@@ -335,19 +335,19 @@ ggplot(immigrants_region, aes(x = `Year`, y = `Total Immigrants`, fill = `Region
   geom_bar(position = "dodge", stat = "identity")
 ```
 
-Now, let's try and perform a linear regression to predict the number of immigrants from each region in 2020:
+
 
 ```{r}
-immigrant_region_linreg <- lm(`Total Immigrants` ~ Region + Year, immigrants_region)
-emigrant_region_linreg <- lm(`Total Emigrants` ~ Region + Year, emigrants_region)
-regions <- c("East Asia & Pacific", "Europe & Central Asia", "Latin America & Caribbean", "Middle East & North Africa", "North America", "South Asia", "Sub-Saharan Africa")
-new_data_region <- data.frame("Region" = regions, "Year" = rep(2020, 7))
-colnames(new_data_region) <- c("Region", "Year")
-summary(immigrant_region_linreg)
-summary(emigrant_region_linreg)
-predictions_2020_region <- data.frame(regions, predict(immigrant_region_linreg, new_data_region), predict(emigrant_region_linreg, new_data_region))
-colnames(predictions_2020_region) <- c("Region", "Expected Total Immigrants in 2020", "Expected Emigrants in 2020")
-predictions_2020_region
+# immigrant_region_linreg <- lm(`Total Immigrants` ~ Region + Year, immigrants_region)
+# emigrant_region_linreg <- lm(`Total Emigrants` ~ Region + Year, emigrants_region)
+# regions <- c("East Asia & Pacific", "Europe & Central Asia", "Latin America & Caribbean", "Middle East & North Africa", "North America", "South Asia", "Sub-Saharan Africa")
+# new_data_region <- data.frame("Region" = regions, "Year" = rep(2020, 7))
+# colnames(new_data_region) <- c("Region", "Year")
+# summary(immigrant_region_linreg)
+# summary(emigrant_region_linreg)
+# predictions_2020_region <- data.frame(regions, predict(immigrant_region_linreg, new_data_region), predict(emigrant_region_linreg, new_data_region))
+# colnames(predictions_2020_region) <- c("Region", "Expected Total Immigrants in 2020", "Expected Emigrants in 2020")
+# predictions_2020_region
 ```
 
 

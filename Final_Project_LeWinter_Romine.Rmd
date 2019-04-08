@@ -292,7 +292,7 @@ rm(BilateralMigration, IncomeRegion, Population)
 
 # Summary Statistics
 
-To begin with, let's see the total numbers of emigrants and immigrants of each kind of income level for all countries:
+To begin with, let's see the total numbers of emigrants and immigrants of each kind of income level for all countries over time:
 ```{r}
 emigrants <- call_neo4j('MATCH (i:Income)<-[:INCOME]-(c:Country)-[:EMMIGRATION]->(m:Migration)-[:IN_YEAR]->(y:Year) RETURN i.name AS Income, y.year AS Year, sum(m.total) AS Total_Emigrants', con) %>%
   data.frame()
@@ -306,7 +306,15 @@ ggplot(immigrants, aes(x = `Year`, y = `Total Immigrants`, fill = `Income Level`
   geom_bar(position = "dodge", stat = "identity")
 ```
 
+Now, let's try and perform a linear regression to predict the number of immigrants:
 
+```{r}
+immigrant_linreg <- lm(`Total Immigrants` ~ `Income Level` + Year, immigrants)
+new_data <- data.frame("Income Level" = c("Low income"), "Year" = c(2020))
+colnames(new_data) <- c("Income Level", "Year")
+summary(immigrant_linreg)
+predict(immigrant_linreg, new_data)
+```
 
 
 

@@ -292,15 +292,16 @@ rm(BilateralMigration, IncomeRegion, Population)
 
 # Summary Statistics
 ```{r}
-emigrants <- call_neo4j('MATCH (c:Country)-[:EMMIGRATION]->(m:Migration) RETURN c.name AS Name, sum(m.total) AS Total_Emigrations, sum(m.male) AS Total_Male_Emigrants, sum(m.female) AS Total_Female_Emigrants', con) %>%
+emigrants <- call_neo4j('MATCH (i:Income)<-[:INCOME]-(c:Country)-[:EMMIGRATION]->(m:Migration) RETURN i.name AS Income, sum(m.total) AS Total_Emigrants', con) %>%
   data.frame()
-colnames(emigrants) <- c("Country Name", "Total Emigrants", "Total Male Emigrants", "Total Female Emigrants")
-immigrants <- call_neo4j('MATCH (c:Country)<-[:IMMIGRATION]-(m:Migration) RETURN c.name AS Name, sum(m.total) AS Total_Immigrations, sum(m.male) AS Total_Male_Immigrants, sum(m.female) AS Total_Female_Immigrants', con) %>%
+colnames(emigrants) <- c("Income Level", "Total Emigrants")
+immigrants <- call_neo4j('MATCH (i:Income)<-[:INCOME]-(c:Country)<-[:IMMIGRATION]-(m:Migration) RETURN i.name AS Income, sum(m.total) AS Total_Emigrants', con) %>%
   data.frame()
-colnames(immigrants) <- c("Country Name", "Total Immigrants", "Total Male Immigrants", "Total Female Immigrants")
-migration_totals <- merge(emigrants, immigrants)
-ggplot(data = migration_totals) + geom_point(aes(x = `Total Emigrants`, y = `Total Immigrants`))
-ggplot(data = migration_totals) + geom_point(aes(x = `Total Emigrants`, y = `Total Immigrants`))
+colnames(immigrants) <- c("Income Level", "Total Immigrants")
+ggplot(emigrants, aes(x = `Income Level`, y = `Total Emigrants`, fill = `Income Level`)) +
+  geom_bar(stat = "identity")
+ggplot(immigrants, aes(x = `Income Level`, y = `Total Immigrants`, fill = `Income Level`)) +
+  geom_bar(stat = "identity")
 ```
 
 

@@ -294,15 +294,23 @@ rm(BilateralMigration, IncomeRegion, Population)
 
 To begin with, let's see the total numbers of emigrants and immigrants of each kind of income level for all countries over time:
 ```{r}
-emigrants_income <- call_neo4j('MATCH (i:Income)<-[:INCOME]-(c:Country)-[:EMMIGRATION]->(m:Migration)-[:IN_YEAR]->(y:Year) RETURN i.name AS Income, y.year AS Year, sum(m.total) AS Total_Emigrants', con) %>%
+emigrants_income <- call_neo4j('MATCH (i:Income)<-[:INCOME]-(c:Country)-[:EMMIGRATION]->(m:Migration)-[:IN_YEAR]->(y:Year) RETURN i.name AS Income, y.year AS Year, sum(m.total) AS Total_Emigrants, sum(m.male) AS Total_Male, sum(m.female) AS Total_Female', con) %>%
   data.frame()
-colnames(emigrants_income) <- c("Income Level", "Year", "Total Emigrants")
-immigrants_income <- call_neo4j('MATCH (i:Income)<-[:INCOME]-(c:Country)<-[:IMMIGRATION]-(m:Migration)-[:IN_YEAR]->(y:Year) RETURN i.name AS Income, y.year AS Year, sum(m.total) AS Total_Emigrants', con) %>%
+colnames(emigrants_income) <- c("Income Level", "Year", "Total Emigrants", "Total Male Emigrants", "Total Female Emigrants")
+immigrants_income <- call_neo4j('MATCH (i:Income)<-[:INCOME]-(c:Country)<-[:IMMIGRATION]-(m:Migration)-[:IN_YEAR]->(y:Year) RETURN i.name AS Income, y.year AS Year, sum(m.total) AS Total_Emigrants, sum(m.male) AS Total_Male, sum(m.female) AS Total_Female', con) %>%
   data.frame()
-colnames(immigrants_income) <- c("Income Level", "Year", "Total Immigrants")
+colnames(immigrants_income) <- c("Income Level", "Year", "Total Immigrants", "Total Male Immigrants", "Total Female Immigrants")
 ggplot(emigrants_income, aes(x = `Year`, y = `Total Emigrants`, fill = `Income Level`)) +
   geom_bar(position = "dodge", stat = "identity")
 ggplot(immigrants_income, aes(x = `Year`, y = `Total Immigrants`, fill = `Income Level`)) +
+  geom_bar(position = "dodge", stat = "identity")
+ggplot(emigrants_income, aes(x = `Year`, y = `Total Female Emigrants`, fill = `Income Level`)) +
+  geom_bar(position = "dodge", stat = "identity")
+ggplot(immigrants_income, aes(x = `Year`, y = `Total Female Immigrants`, fill = `Income Level`)) +
+  geom_bar(position = "dodge", stat = "identity")
+ggplot(emigrants_income, aes(x = `Year`, y = `Total Male Emigrants`, fill = `Income Level`)) +
+  geom_bar(position = "dodge", stat = "identity")
+ggplot(immigrants_income, aes(x = `Year`, y = `Total Male Immigrants`, fill = `Income Level`)) +
   geom_bar(position = "dodge", stat = "identity")
 ```
 
@@ -323,15 +331,23 @@ ggplot(immigrants_income, aes(x = `Year`, y = `Total Immigrants`, fill = `Income
 
 Having done that, let's do the same thing again, except this time we'll be looking at migration by countries' regions instead of their income levels:
 ```{r}
-emigrants_region <- call_neo4j('MATCH (r:Region)<-[:REGION]-(c:Country)-[:EMMIGRATION]->(m:Migration)-[:IN_YEAR]->(y:Year) RETURN r.name AS Region, y.year AS Year, sum(m.total) AS Total_Emigrants', con) %>%
+emigrants_region <- call_neo4j('MATCH (r:Region)<-[:REGION]-(c:Country)-[:EMMIGRATION]->(m:Migration)-[:IN_YEAR]->(y:Year) RETURN r.name AS Region, y.year AS Year, sum(m.total) AS Total_Emigrants, sum(m.male) AS Total_Male, sum(m.female) AS Total_Female', con) %>%
   data.frame()
-colnames(emigrants_region) <- c("Region", "Year", "Total Emigrants")
-immigrants_region <- call_neo4j('MATCH (r:Region)<-[:REGION]-(c:Country)<-[:IMMIGRATION]-(m:Migration)-[:IN_YEAR]->(y:Year) RETURN r.name AS Region, y.year AS Year, sum(m.total) AS Total_Immigrants', con) %>%
+colnames(emigrants_region) <- c("Region", "Year", "Total Emigrants", "Total Male Emigrants", "Total Female Emigrants")
+immigrants_region <- call_neo4j('MATCH (r:Region)<-[:REGION]-(c:Country)<-[:IMMIGRATION]-(m:Migration)-[:IN_YEAR]->(y:Year) RETURN r.name AS Region, y.year AS Year, sum(m.total) AS Total_Immigrants, sum(m.male) AS Total_Male, sum(m.female) AS Total_Female', con) %>%
   data.frame()
-colnames(immigrants_region) <- c("Region", "Year", "Total Immigrants")
+colnames(immigrants_region) <- c("Region", "Year", "Total Immigrants", "Total Male Immigrants", "Total Female Immigrants")
 ggplot(emigrants_region, aes(x = `Year`, y = `Total Emigrants`, fill = `Region`)) +
   geom_bar(position = "dodge", stat = "identity")
 ggplot(immigrants_region, aes(x = `Year`, y = `Total Immigrants`, fill = `Region`)) +
+  geom_bar(position = "dodge", stat = "identity")
+ggplot(emigrants_region, aes(x = `Year`, y = `Total Female Emigrants`, fill = `Region`)) +
+  geom_bar(position = "dodge", stat = "identity")
+ggplot(immigrants_region, aes(x = `Year`, y = `Total Female Immigrants`, fill = `Region`)) +
+  geom_bar(position = "dodge", stat = "identity")
+ggplot(emigrants_region, aes(x = `Year`, y = `Total Male Emigrants`, fill = `Region`)) +
+  geom_bar(position = "dodge", stat = "identity")
+ggplot(immigrants_region, aes(x = `Year`, y = `Total Male Immigrants`, fill = `Region`)) +
   geom_bar(position = "dodge", stat = "identity")
 ```
 

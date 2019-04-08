@@ -291,17 +291,19 @@ rm(BilateralMigration, IncomeRegion, Population)
 ```
 
 # Summary Statistics
+
+To begin with, let's see the total numbers of emigrants and immigrants of each kind of income level for all countries:
 ```{r}
-emigrants <- call_neo4j('MATCH (i:Income)<-[:INCOME]-(c:Country)-[:EMMIGRATION]->(m:Migration) RETURN i.name AS Income, sum(m.total) AS Total_Emigrants', con) %>%
+emigrants <- call_neo4j('MATCH (i:Income)<-[:INCOME]-(c:Country)-[:EMMIGRATION]->(m:Migration)-[:IN_YEAR]->(y:Year) RETURN i.name AS Income, y.year AS Year, sum(m.total) AS Total_Emigrants', con) %>%
   data.frame()
-colnames(emigrants) <- c("Income Level", "Total Emigrants")
-immigrants <- call_neo4j('MATCH (i:Income)<-[:INCOME]-(c:Country)<-[:IMMIGRATION]-(m:Migration) RETURN i.name AS Income, sum(m.total) AS Total_Emigrants', con) %>%
+colnames(emigrants) <- c("Income Level", "Year", "Total Emigrants")
+immigrants <- call_neo4j('MATCH (i:Income)<-[:INCOME]-(c:Country)<-[:IMMIGRATION]-(m:Migration)-[:IN_YEAR]->(y:Year) RETURN i.name AS Income, y.year AS Year, sum(m.total) AS Total_Emigrants', con) %>%
   data.frame()
-colnames(immigrants) <- c("Income Level", "Total Immigrants")
-ggplot(emigrants, aes(x = `Income Level`, y = `Total Emigrants`, fill = `Income Level`)) +
-  geom_bar(stat = "identity")
-ggplot(immigrants, aes(x = `Income Level`, y = `Total Immigrants`, fill = `Income Level`)) +
-  geom_bar(stat = "identity")
+colnames(immigrants) <- c("Income Level", "Year", "Total Immigrants")
+ggplot(emigrants, aes(x = `Year`, y = `Total Emigrants`, fill = `Income Level`)) +
+  geom_bar(position = "dodge", stat = "identity")
+ggplot(immigrants, aes(x = `Year`, y = `Total Immigrants`, fill = `Income Level`)) +
+  geom_bar(position = "dodge", stat = "identity")
 ```
 
 

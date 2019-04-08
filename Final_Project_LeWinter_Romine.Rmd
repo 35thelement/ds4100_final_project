@@ -294,29 +294,61 @@ rm(BilateralMigration, IncomeRegion, Population)
 
 To begin with, let's see the total numbers of emigrants and immigrants of each kind of income level for all countries over time:
 ```{r}
-emigrants <- call_neo4j('MATCH (i:Income)<-[:INCOME]-(c:Country)-[:EMMIGRATION]->(m:Migration)-[:IN_YEAR]->(y:Year) RETURN i.name AS Income, y.year AS Year, sum(m.total) AS Total_Emigrants', con) %>%
+emigrants_income <- call_neo4j('MATCH (i:Income)<-[:INCOME]-(c:Country)-[:EMMIGRATION]->(m:Migration)-[:IN_YEAR]->(y:Year) RETURN i.name AS Income, y.year AS Year, sum(m.total) AS Total_Emigrants', con) %>%
   data.frame()
-colnames(emigrants) <- c("Income Level", "Year", "Total Emigrants")
-immigrants <- call_neo4j('MATCH (i:Income)<-[:INCOME]-(c:Country)<-[:IMMIGRATION]-(m:Migration)-[:IN_YEAR]->(y:Year) RETURN i.name AS Income, y.year AS Year, sum(m.total) AS Total_Emigrants', con) %>%
+colnames(emigrants_income) <- c("Income Level", "Year", "Total Emigrants")
+immigrants_income <- call_neo4j('MATCH (i:Income)<-[:INCOME]-(c:Country)<-[:IMMIGRATION]-(m:Migration)-[:IN_YEAR]->(y:Year) RETURN i.name AS Income, y.year AS Year, sum(m.total) AS Total_Emigrants', con) %>%
   data.frame()
-colnames(immigrants) <- c("Income Level", "Year", "Total Immigrants")
-ggplot(emigrants, aes(x = `Year`, y = `Total Emigrants`, fill = `Income Level`)) +
+colnames(immigrants_income) <- c("Income Level", "Year", "Total Immigrants")
+ggplot(emigrants_income, aes(x = `Year`, y = `Total Emigrants`, fill = `Income Level`)) +
   geom_bar(position = "dodge", stat = "identity")
-ggplot(immigrants, aes(x = `Year`, y = `Total Immigrants`, fill = `Income Level`)) +
+ggplot(immigrants_income, aes(x = `Year`, y = `Total Immigrants`, fill = `Income Level`)) +
   geom_bar(position = "dodge", stat = "identity")
 ```
 
-Now, let's try and perform a linear regression to predict the number of immigrants:
+Now, let's try and perform a linear regression to predict the number of immigrants and emigrants from each levels of income of countries in 2020:
 
 ```{r}
-immigrant_linreg <- lm(`Total Immigrants` ~ `Income Level` + Year, immigrants)
-new_data <- data.frame("Income Level" = c("Low income"), "Year" = c(2020))
-colnames(new_data) <- c("Income Level", "Year")
-summary(immigrant_linreg)
-predict(immigrant_linreg, new_data)
+immigrant_income_linreg <- lm(`Total Immigrants` ~ `Income Level` + Year, immigrants_income)
+emigrant_income_linreg <- lm(`Total Emigrants` ~ `Income Level` + Year, emigrants_income)
+income_levels <- c("Low income", "Lower middle income", "Upper middle income", "High income")
+new_data_income <- data.frame("Income Level" = income_levels, "Year" = rep(2020, 4))
+colnames(new_data_income) <- c("Income Level", "Year")
+summary(immigrant_income_linreg)
+summary(emigrant_income_linreg)
+predictions_2020_income <- data.frame(income_levels, predict(immigrant_income_linreg, new_data_income), predict(emigrant_income_linreg, new_data_income))
+colnames(predictions_2020_income) <- c("Income Level", "Expected Total Immigrants in 2020", "Expected Emigrants in 2020")
+predictions_2020_income
 ```
 
+Having done that, let's do the same thing again, except this time we'll be looking at migration by countries' regions instead of their income levels:
+```{r}
+emigrants_region <- call_neo4j('MATCH (r:Region)<-[:REGION]-(c:Country)-[:EMMIGRATION]->(m:Migration)-[:IN_YEAR]->(y:Year) RETURN r.name AS Region, y.year AS Year, sum(m.total) AS Total_Emigrants', con) %>%
+  data.frame()
+colnames(emigrants_region) <- c("Region", "Year", "Total Emigrants")
+immigrants_region <- call_neo4j('MATCH (r:Region)<-[:REGION]-(c:Country)<-[:IMMIGRATION]-(m:Migration)-[:IN_YEAR]->(y:Year) RETURN r.name AS Region, y.year AS Year, sum(m.total) AS Total_Immigrants', con) %>%
+  data.frame()
+colnames(immigrants_region) <- c("Region", "Year", "Total Immigrants")
+ggplot(emigrants_region, aes(x = `Year`, y = `Total Emigrants`, fill = `Region`)) +
+  geom_bar(position = "dodge", stat = "identity")
+ggplot(immigrants_region, aes(x = `Year`, y = `Total Immigrants`, fill = `Region`)) +
+  geom_bar(position = "dodge", stat = "identity")
+```
 
+Now, let's try and perform a linear regression to predict the number of immigrants from each region in 2020:
+
+```{r}
+immigrant_region_linreg <- lm(`Total Immigrants` ~ Region + Year, immigrants_region)
+emigrant_region_linreg <- lm(`Total Emigrants` ~ Region + Year, emigrants_region)
+regions <- c("East Asia & Pacific", "Europe & Central Asia", "Latin America & Caribbean", "Middle East & North Africa", "North America", "South Asia", "Sub-Saharan Africa")
+new_data_region <- data.frame("Region" = regions, "Year" = rep(2020, 7))
+colnames(new_data_region) <- c("Region", "Year")
+summary(immigrant_region_linreg)
+summary(emigrant_region_linreg)
+predictions_2020_region <- data.frame(regions, predict(immigrant_region_linreg, new_data_region), predict(emigrant_region_linreg, new_data_region))
+colnames(predictions_2020_region) <- c("Region", "Expected Total Immigrants in 2020", "Expected Emigrants in 2020")
+predictions_2020_region
+```
 
 
 

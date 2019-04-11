@@ -354,6 +354,29 @@ ggplot(immigrants_income, aes(x = `Year`, y = `Total Male Immigrants`, fill = `I
   geom_bar(position = "dodge", stat = "identity")
 ```
 
+Now, let's try using this data to predict the total number of immigrants to all countries with different income levels in 2010. First, we create linear regression models:
+
+```{r, echo=FALSE}
+immigrant_income_linreg <- lm(`Total Immigrants` ~ `Income Level` + Year, immigrants_income)
+emigrant_income_linreg <- lm(`Total Emigrants` ~ `Income Level` + Year, emigrants_income)
+income_levels <- c("Low income", "Lower middle income", "Upper middle income", "High income")
+new_data_income <- data.frame("Income Level" = income_levels, "Year" = rep(2010, 4))
+colnames(new_data_income) <- c("Income Level", "Year")
+summary(immigrant_income_linreg)
+summary(emigrant_income_linreg)
+```
+
+Notice that the residual standard error values are very high. Using these linear regression models, we will create confidence intervals for the values that we will predict:
+
+```{r, echo=FALSE}
+predictions_2010_income <- data.frame(income_levels, predict(immigrant_income_linreg, new_data_income, interval = "confidence"), predict(emigrant_income_linreg, new_data_income, interval = "confidence"))
+colnames(predictions_2010_income) <- 
+  c("Income Level", "Expected Immigrants in 2010", "Lower Bound", "Upper Bound", "Expected Emigrants in 2010", "Lower Bound", "Upper Bound")
+predictions_2010_income
+```
+
+The confidence intervals for immigration are very large, so the data that is presented in these linear regressions is not much better than wild guessing.
+
 ### Total Migration by Region and Gender
 ```{r, echo=FALSE}
 emigrants_region <- call_neo4j('MATCH (r:Region)<-[:REGION]-(c:Country)-[:EMMIGRATION]->(m:Migration)-[:IN_YEAR]->(y:Year) RETURN r.name AS Region, y.year AS Year, sum(m.total) AS Total_Emigrants, sum(m.male) AS Total_Male, sum(m.female) AS Total_Female', con) %>%
@@ -396,6 +419,36 @@ ggplot(immigrants_region, aes(x = `Year`, y = `Total Male Immigrants`, fill = `R
   geom_bar(position = "dodge", stat = "identity")
 ```
 
+As before, we're going to try to predict the total number of migrants to and from each region of the world for the year 2010. We create linear regressions once more:
 
+```{r, echo=FALSE}
+immigrant_region_linreg <- lm(`Total Immigrants` ~ `Region` + Year, immigrants_region)
+emigrant_region_linreg <- lm(`Total Emigrants` ~ `Region` + Year, emigrants_region)
+regions <- unique(emigrants_region$Region)
+new_data_region <- data.frame("Region" = regions, "Year" = rep(2010, 7))
+colnames(new_data_income) <- c("Region", "Year")
+summary(immigrant_region_linreg)
+summary(emigrant_income_linreg)
+```
 
+Similarly, the residual standard errors are very large. However, we will still attempt to predict the numbers of migrants for the year 2010:
 
+```{r, echo=FALSE}
+predictions_2010_region <- data.frame(regions, predict(immigrant_region_linreg, new_data_region, interval = "confidence"), predict(emigrant_region_linreg, new_data_region, interval = "confidence"))
+colnames(predictions_2010_region) <- 
+  c("Region", "Expected Immigrants in 2010", "Lower Bound", "Upper Bound", "Expected Emigrants in 2010", "Lower Bound", "Upper Bound")
+predictions_2010_region
+```
+
+Once again, it is clear that the confidence intervals for these predicted values are very large, and the linear regression models that we created are not very accurate.
+
+## Limitations & Challenges
+
+Below are listed some of the limitations that we discovered when it came to performing analysis on this data:
+- The data only goes up to the year 2000, and does not account for significant historical events in recent history that have had a deal of impact on migration patterns (9/11, travel bans, international politics).
+- The data is in 10-year increments, and therefore year-to-year prediction was not possible.
+- When attempting to create linear regressions for the data, there were very large residual standard error values, which resulted in inaccurate predictions with little confidence.
+
+## Future Work
+
+One of the possible ways to utilize this data in the future is to link it to a database of news articles that go into detail about international politics to show the different ways that certain events affected immigration patterns in  the future.

@@ -293,7 +293,7 @@ rm(BilateralMigration, IncomeRegion, Population)
 
 # Summary Statistics
 ### Yearly Global Population
-```{r, include=FALSE}
+```{r}
 global_pop <- call_neo4j("match (p:Population)-->(y:Year) return y.year as Year, sum(p.female) as Female, sum(p.male) as Male", con) %>% data.frame()
 colnames(global_pop) <- c("Year", "Female", "Male")
 global_pop <- gather(global_pop, `Female`, `Male`, key="Gender", value="Population")
@@ -303,7 +303,7 @@ ggplot(global_pop, aes(x=`Year`, y=`Population`, fill=`Gender`)) +
 ```
 
 ### Yearly Global Migration
-```{r, echo=FALSE}
+```{r}
 global_mig <- call_neo4j("match (m:Migration)-->(y:Year) return y.year as Year, sum(m.female) as Female, sum(m.male) as Male", con) %>% data.frame()
 colnames(global_mig) <- c("Year", "Female", "Male")
 global_mig <- gather(global_mig, `Female`, `Male`, key="Gender", value="Migrants")
@@ -313,7 +313,7 @@ ggplot(global_mig, aes(x=`Year`, y=`Migrants`, fill=`Gender`)) +
 ```
 
 ### Total Migration by Income Level and Gender
-```{r, echo=FALSE}
+```{r}
 emigrants_income <- call_neo4j('MATCH (i:Income)<-[:INCOME]-(c:Country)-[:EMMIGRATION]->(m:Migration)-[:IN_YEAR]->(y:Year) RETURN i.name AS Income, y.year AS Year, sum(m.total) AS Total_Emigrants, sum(m.male) AS Total_Male, sum(m.female) AS Total_Female', con) %>%
   data.frame()
 colnames(emigrants_income) <- c("Income Level", "Year", "Total Emigrants", "Total Male Emigrants", "Total Female Emigrants")
@@ -324,14 +324,14 @@ colnames(immigrants_income) <- c("Income Level", "Year", "Total Immigrants", "To
 
 Over time, emigration has increased for all income levels, but the increase is most drastic for middle income countries:
 
-```{r, echo=FALSE}
+```{r}
 ggplot(emigrants_income, aes(x = `Year`, y = `Total Emigrants`, fill = `Income Level`)) +
   geom_bar(position = "dodge", stat = "identity")
 ```
 
 Emigration was roughly proportional between women and men, though the proportion of men emigrating from upper-middle income countries took longer to surpass emigration from lower-middle income countries than it did for women, for whom the difference is much greater:
 
-```{r, echo=FALSE}
+```{r}
 ggplot(emigrants_income, aes(x = `Year`, y = `Total Female Emigrants`, fill = `Income Level`)) +
   geom_bar(position = "dodge", stat = "identity")
 ggplot(emigrants_income, aes(x = `Year`, y = `Total Male Emigrants`, fill = `Income Level`)) +
@@ -340,14 +340,14 @@ ggplot(emigrants_income, aes(x = `Year`, y = `Total Male Emigrants`, fill = `Inc
 
 High income countries always received the lion's share of immigrants, and they seem to be the destination for most of the increase in migrants shown in the previous charts, such that their share grew larger every decade. Immigration to upper-middle income countries experienced a much less dramatic rise each decade, while immigration to lower-middle income countries actually decreased between 1960 and 2000:
 
-```{r, echo=FALSE}
+```{r}
 ggplot(immigrants_income, aes(x = `Year`, y = `Total Immigrants`, fill = `Income Level`)) +
   geom_bar(position = "dodge", stat = "identity")
 ```
 
 Immigration to different income-level countries followed roughly the same trends for men and women:
 
-```{r, echo=FALSE}
+```{r}
 ggplot(immigrants_income, aes(x = `Year`, y = `Total Female Immigrants`, fill = `Income Level`)) +
   geom_bar(position = "dodge", stat = "identity")
 ggplot(immigrants_income, aes(x = `Year`, y = `Total Male Immigrants`, fill = `Income Level`)) +
@@ -356,7 +356,7 @@ ggplot(immigrants_income, aes(x = `Year`, y = `Total Male Immigrants`, fill = `I
 
 Now, let's try using this data to predict the total number of immigrants to all countries with different income levels in 2010. First, we create linear regression models:
 
-```{r, echo=FALSE}
+```{r}
 immigrant_income_linreg <- lm(`Total Immigrants` ~ `Income Level` + Year, immigrants_income)
 emigrant_income_linreg <- lm(`Total Emigrants` ~ `Income Level` + Year, emigrants_income)
 income_levels <- c("Low income", "Lower middle income", "Upper middle income", "High income")
@@ -368,7 +368,7 @@ summary(emigrant_income_linreg)
 
 Notice that the residual standard error values are very high. Using these linear regression models, we will create confidence intervals for the values that we will predict:
 
-```{r, echo=FALSE}
+```{r}
 predictions_2010_income <- data.frame(income_levels, predict(immigrant_income_linreg, new_data_income, interval = "confidence"), predict(emigrant_income_linreg, new_data_income, interval = "confidence"))
 colnames(predictions_2010_income) <- 
   c("Income Level", "Expected Immigrants in 2010", "Lower Bound", "Upper Bound", "Expected Emigrants in 2010", "Lower Bound", "Upper Bound")
@@ -378,7 +378,7 @@ predictions_2010_income
 The confidence intervals for immigration are very large, so the data that is presented in these linear regressions is not much better than wild guessing.
 
 ### Total Migration by Region and Gender
-```{r, echo=FALSE}
+```{r}
 emigrants_region <- call_neo4j('MATCH (r:Region)<-[:REGION]-(c:Country)-[:EMMIGRATION]->(m:Migration)-[:IN_YEAR]->(y:Year) RETURN r.name AS Region, y.year AS Year, sum(m.total) AS Total_Emigrants, sum(m.male) AS Total_Male, sum(m.female) AS Total_Female', con) %>%
   data.frame()
 colnames(emigrants_region) <- c("Region", "Year", "Total Emigrants", "Total Male Emigrants", "Total Female Emigrants")
@@ -389,14 +389,14 @@ colnames(immigrants_region) <- c("Region", "Year", "Total Immigrants", "Total Ma
 
 Emigrants leave Europe and Central Asia at a much greater rate than any other region. While emigration from South Asia and North America stayed roughly equal over time, emigration from every other region increased each decade.
 
-```{r, echo=FALSE}
+```{r}
 ggplot(emigrants_region, aes(x = `Year`, y = `Total Emigrants`, fill = `Region`)) +
   geom_bar(position = "dodge", stat = "identity")
 ```
 
 Women and men seem to emigrate from the different regions at proportional rates, with one exception - South Asian emigrants are more likely to be male:
 
-```{r, echo=FALSE}
+```{r}
 ggplot(emigrants_region, aes(x = `Year`, y = `Total Female Emigrants`, fill = `Region`)) +
   geom_bar(position = "dodge", stat = "identity")
 ggplot(emigrants_region, aes(x = `Year`, y = `Total Male Emigrants`, fill = `Region`)) +
@@ -405,14 +405,14 @@ ggplot(emigrants_region, aes(x = `Year`, y = `Total Male Emigrants`, fill = `Reg
 
 Immigration to Latin America and Caribbean countries and Sub-Saharan Africa stayed roughly equal over time. Immigration to South Asia actually decreased every decade, while immigration to Europe and Central Asia increased monotonically and the proportion immigrating to North America greatly increased from 1980-2000:
 
-```{r, echo=FALSE}
+```{r}
 ggplot(immigrants_region, aes(x = `Year`, y = `Total Immigrants`, fill = `Region`)) +
   geom_bar(position = "dodge", stat = "identity")
 ```
 
 Women and men seem to immigrate to the different regions at proportional rates, with one exception - men are much more likely to immigrate to the Middle East and North Africa:
 
-```{r, echo=FALSE}
+```{r}
 ggplot(immigrants_region, aes(x = `Year`, y = `Total Female Immigrants`, fill = `Region`)) +
   geom_bar(position = "dodge", stat = "identity")
 ggplot(immigrants_region, aes(x = `Year`, y = `Total Male Immigrants`, fill = `Region`)) +
@@ -421,7 +421,7 @@ ggplot(immigrants_region, aes(x = `Year`, y = `Total Male Immigrants`, fill = `R
 
 As before, we're going to try to predict the total number of migrants to and from each region of the world for the year 2010. We create linear regressions once more:
 
-```{r, echo=FALSE}
+```{r}
 immigrant_region_linreg <- lm(`Total Immigrants` ~ `Region` + Year, immigrants_region)
 emigrant_region_linreg <- lm(`Total Emigrants` ~ `Region` + Year, emigrants_region)
 regions <- unique(emigrants_region$Region)
@@ -433,7 +433,7 @@ summary(emigrant_income_linreg)
 
 Similarly, the residual standard errors are very large. However, we will still attempt to predict the numbers of migrants for the year 2010:
 
-```{r, echo=FALSE}
+```{r}
 predictions_2010_region <- data.frame(regions, predict(immigrant_region_linreg, new_data_region, interval = "confidence"), predict(emigrant_region_linreg, new_data_region, interval = "confidence"))
 colnames(predictions_2010_region) <- 
   c("Region", "Expected Immigrants in 2010", "Lower Bound", "Upper Bound", "Expected Emigrants in 2010", "Lower Bound", "Upper Bound")
